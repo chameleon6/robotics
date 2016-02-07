@@ -1,7 +1,7 @@
-import numpy as np
 import os
 import sys
 import time
+import nn
 
 matlab_state_file = os.getcwd() + '/matlab_state_file.out'
 python_action_file = os.getcwd() + '/python_action_file.out'

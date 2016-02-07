@@ -3,3 +3,4 @@
 !/KneedCompassGait
 !/Pendulum
 !/.gitignore
+*pyc

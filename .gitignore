@@ -4,3 +4,6 @@
 !/Pendulum
 !/.gitignore
 *pyc
+*autosave
+*out
+*tmp

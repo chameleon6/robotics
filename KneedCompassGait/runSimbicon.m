@@ -41,7 +41,7 @@ x0.base_xdot = 0.3;
 x0.x1 = 4; %start_state
 
 % Run simulation, then play it back at realtime speed
-xtraj = simulate(sys, [0 4], x0);
+xtraj = simulate(sys, [0 2], x0);
 
 runtime = cputime - start_time
 p_opts = struct('slider', true);

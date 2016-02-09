@@ -25,7 +25,7 @@ class ControlNN:
         self.n_s = 2
         self.n_a = 1
         self.n_sa = 3
-        n_hidden = 5
+        n_hidden = 20
         self.n_1 = n_hidden
         self.n_2 = n_hidden
         self.one_layer_only = True
@@ -46,10 +46,11 @@ class ControlNN:
             o2 = tf.nn.dropout(nonlinearity(tf.matmul(o1, self.W_1_2) + self.b_2), self.keep_prob)
             return tf.matmul(o2, self.W_2_q) + self.b_q
 
+        self.o1 = nonlinearity(tf.matmul(self.sa_learn, self.W_sa_1) + self.b_1)
         self.q_learn = q_from_input(self.sa_learn)
-        self.y_learn = tf.placeholder('float', shape = [None])
+        self.y_learn = tf.placeholder('float', shape = [None, 1])
         self.learn_error = tf.reduce_mean(tf.square(self.y_learn - self.q_learn))
-        self.learn_opt = tf.train.AdamOptimizer().minimize(self.learn_error)
+        self.learn_opt = tf.train.AdamOptimizer(0.001).minimize(self.learn_error)
 
         self.s_query = tf.placeholder('float', shape=[1, self.n_s])
         self.a_query = unif_fanin_mat([1, self.n_a])
@@ -72,9 +73,13 @@ class ControlNN:
                 [self.W_sa_1, self.b_1, self.W_1_2, self.b_2, self.W_2_q, self.b_q]):
             print name
             print self.sess.run(param)
+        print
 
     def q_from_sa(self, sa_vals):
         return self.sess.run(self.q_learn, feed_dict={self.sa_learn: sa_vals, self.keep_prob: 1.0})
+
+    def o1_from_sa(self, sa_vals):
+        return self.sess.run(self.o1, feed_dict={self.sa_learn: sa_vals, self.keep_prob: 1.0})
 
     def graph_output(self, s):
         assert self.n_a == 1

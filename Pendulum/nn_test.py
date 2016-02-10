@@ -3,12 +3,13 @@ import time
 import sys
 
 start_time = time.time()
-net = ControlNN()
+save_path = '/tmp/model.ckpt'
+net = ControlNN(save_path)
 print "compile time", time.time() - start_time
 
 s = np.array([0.5, 0.5])
 mb_size = 20
-num_mb = 3000
+num_mb = 100
 n_test = 1000
 
 def ys_from_xs(xs):
@@ -32,7 +33,7 @@ for i in range(num_mb):
     if i%1000 == 0:
         print i, net.mse_q(xs_test, ys_test), net.mse_q(sample_x, sample_y)
 
-net.save_model()
+net.save_model(save_path)
 print "train time", time.time() - start_time
 
 print net.get_best_a(s)

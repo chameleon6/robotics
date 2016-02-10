@@ -8,7 +8,7 @@ def s_const_grid(s):
     return xs, np.concatenate((np.ones((n,1)) * s[np.newaxis,:], xs), 1)
 
 class ControlNN:
-    def __init__(self):
+    def __init__(self, load_file=None):
         tf_random_seed = 6
         nonlinearity = tf.nn.relu
         self.keep_prob_train_val = 1.0
@@ -61,23 +61,24 @@ class ControlNN:
         self.sa_query = tf.concat(1, [self.s_query, self.a_query])
         self.q_query = q_from_input(self.sa_query)
 
-        query_opt = tf.train.AdamOptimizer(1.0)
+        query_opt = tf.train.AdamOptimizer(0.001)
         query_grads_and_vars = query_opt.compute_gradients(self.q_query, [self.a_query])
         # list of tuples (gradient, variable).
         query_grads_and_vars[0] = (-query_grads_and_vars[0][0], query_grads_and_vars[0][1])
         self.apply_query_grads = query_opt.apply_gradients(query_grads_and_vars)
 
-        self.save_path = '/tmp/model.ckpt'
         self.saver = tf.train.Saver(self.name_var_dict)
-        self.use_saved = True
 
         self.sess = tf.Session()
 
         self.init_op = tf.initialize_all_variables()
         self.sess.run(self.init_op)
 
-        if self.use_saved:
-            self.load_model()
+        if load_file != None:
+            self.load_model(load_file)
+
+    def __del__(self):
+        self.sess.close()
 
     def print_params(self):
         for (name, param) in enumerate(self.name_var_dict):
@@ -87,6 +88,9 @@ class ControlNN:
 
     def q_from_sa(self, sa_vals):
         return self.sess.run(self.q_learn, feed_dict={self.sa_learn: sa_vals, self.keep_prob: 1.0})
+
+    def q_query_from_s(self, s_vals):
+        return self.sess.run(self.q_query, feed_dict={self.s_query: s_vals[np.newaxis,:], self.keep_prob: 1.0})
 
     def o1_from_sa(self, sa_vals):
         return self.sess.run(self.o1, feed_dict={self.sa_learn: sa_vals, self.keep_prob: 1.0})
@@ -99,14 +103,19 @@ class ControlNN:
         plt.show()
         return outputs
 
-    def get_best_a(self, s):
-        for i in range(100):
-            #if i%10 == 0:
-            #    print i
+    def get_best_a(self, s, tolerance=0.0001):
+        # TODO: initialize a intelligently
+        count = 0
+        old_q = self.q_query_from_s(s)
+        while True:
             self.sess.run(self.apply_query_grads, feed_dict={self.s_query: s[np.newaxis,:], self.keep_prob: 1.0})
-            #self.query_opt.run(feed_dict={self.s_query: s})
-
-        return self.sess.run(self.a_query)
+            new_q = self.q_query_from_s(s)
+            print count, old_q, new_q
+            count += 1
+            if np.abs(new_q - old_q) < tolerance:
+                break
+            old_q = new_q
+        return self.sess.run(self.a_query), new_q
 
     def mse_q(self, sa_vals, y_vals):
         return self.sess.run(self.learn_error,
@@ -116,8 +125,8 @@ class ControlNN:
         self.sess.run(self.learn_opt, feed_dict={self.y_learn: y_vals,
             self.sa_learn: sa_vals, self.keep_prob: self.keep_prob_train_val})
 
-    def save_model(self):
-        self.saver.save(self.sess, self.save_path)
+    def save_model(self, save_path):
+        self.saver.save(self.sess, save_path)
 
-    def load_model(self):
-        self.saver.restore(self.sess, self.save_path)
+    def load_model(self, load_path):
+        self.saver.restore(self.sess, load_path)

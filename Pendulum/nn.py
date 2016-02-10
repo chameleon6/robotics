@@ -103,18 +103,20 @@ class ControlNN:
         plt.show()
         return outputs
 
-    def get_best_a(self, s, tolerance=0.0001):
+    def get_best_a(self, s, tolerance=0.001):
         # TODO: initialize a intelligently
         count = 0
         old_q = self.q_query_from_s(s)
         while True:
             self.sess.run(self.apply_query_grads, feed_dict={self.s_query: s[np.newaxis,:], self.keep_prob: 1.0})
             new_q = self.q_query_from_s(s)
-            print count, old_q, new_q
+            #print count, old_q, new_q
             count += 1
             if np.abs(new_q - old_q) < tolerance:
                 break
             old_q = new_q
+
+        #print "iterations until max_a converged:", count
         return self.sess.run(self.a_query), new_q
 
     def mse_q(self, sa_vals, y_vals):

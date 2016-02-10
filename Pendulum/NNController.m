@@ -22,7 +22,7 @@ classdef NNController < DrakeSystem
     % end
 
     function ts = getSampleTime(obj)
-      ts = [0.001 0; 0 0];
+      ts = [0.01 0; 0 0];
     end
 
     function r = reward(obj,x)
@@ -37,30 +37,38 @@ classdef NNController < DrakeSystem
       fclose(f);
 
       %debug
-      fprintf('writing state\n');
-      fprintf('%d\n', obj.reward(x));
-      fprintf('%d ', x);
-      fprintf('\n');
+      % fprintf('writing state\n');
+      % fprintf('%d\n', obj.reward(x));
+      % fprintf('%d ', x);
+      % fprintf('\n');
     end
 
     function a = get_action(obj)
       start_time = cputime;
-      while exist(obj.python_action_file, 'file') ~= 2
-        if cputime - start_time > 10
-          error('timeout')
+      while true
+        while exist(obj.python_action_file, 'file') ~= 2
+          if cputime - start_time > 10
+            error('timeout')
+          end
+          continue;
         end
-        continue;
+
+        f = fopen(obj.python_action_file, 'r');
+        a = fscanf(f, '%f\n');
+        fclose(f);
+        if isempty(a)
+          fprintf('python incomplete output')
+          continue;
+        end
+
+        delete(obj.python_action_file);
+
+        %debug
+        % fprintf('read state:\n');
+        % fprintf('%d ', a);
+        % fprintf('\n');
+        break;
       end
-
-      f = fopen(obj.python_action_file, 'r');
-      a = fscanf(f, '%f\n');
-      fclose(f);
-      delete(obj.python_action_file);
-
-      %debug
-      fprintf('read state:\n');
-      fprintf('%d ', a);
-      fprintf('\n');
 
     end
 
@@ -74,6 +82,9 @@ classdef NNController < DrakeSystem
       %     fprintf(1,'%20s = %f\n',coordinates{i},x(i));
       %   end
       % end
+      if mod(int16(t*100),5) == 0
+        t
+      end
 
       obj.write_state(x);
       u = obj.get_action();

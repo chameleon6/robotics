@@ -26,7 +26,12 @@ classdef NNController < DrakeSystem
     end
 
     function r = reward(obj,x)
-      r = -(x(1) - pi)^2;
+      %r = -(x(1) - pi)^2;
+      if cos(x(1)) < 0
+        r = 1;
+      else
+        r = 0;
+      end
     end
 
     function write_state(obj,x)

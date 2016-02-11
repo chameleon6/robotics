@@ -3,6 +3,7 @@ import os
 import sys
 import time
 import copy
+from utils import *
 from nn import ControlNN
 from TransitionContainer import TransitionContainer
 
@@ -26,9 +27,13 @@ gamma = 0.99
 ready_to_train = False
 
 transfer_path = '/tmp/model_transfer'
+save_path = 'models/model_%s.out' % (int(time.time() * 10000) % 100000)
+print 'saving to', save_path
+
+max_torque = 3
 
 def random_action():
-    return np.random.uniform(-1,1)
+    return np.random.uniform(-max_torque,max_torque)
 
 print "ready for matlab"
 while True:
@@ -36,6 +41,7 @@ while True:
     while not os.path.isfile(matlab_state_file):
         if time.time() - start_time > 10:
             print "timeout"
+            current_net.save_model(save_path)
             sys.exit()
         pass
 
@@ -62,15 +68,23 @@ while True:
         current_net.save_model(transfer_path)
         old_net.load_model(transfer_path)
 
-    action = current_net.get_best_a(state)[0][0][0] if np.random.random() > epsilon else random_action()
+    action = current_net.get_best_a(state, -max_torque, max_torque)[0][0][0] \
+            if np.random.random() > epsilon else random_action()
     print 'action', action
 
     if ready_to_train:
         ts = transitions.random_sample(minibatch_size)
         print ts
         def y_from_sample(sample):
-            return sample[2] + gamma * old_net.get_best_a(sample[3])[1][0][0]
+            #start = time.time()
+            y = sample[2] + gamma * old_net.get_best_a(sample[3], -max_torque, max_torque)[1][0][0]
+            #print "maximizing time", time.time() - start
+            return y
+
+        tic('total max time')
         ys = np.array(map(y_from_sample, ts))[:, np.newaxis]
+        toc('total max time')
+
         sa = np.array([np.append(t[0], t[1]) for t in ts])
 
         print 'ys'
@@ -79,7 +93,9 @@ while True:
         print sa
         print
 
+        tic('train time')
         current_net.train(sa, ys)
+        toc('train time')
         times_trained += 1
         epsilon = max(final_epsilon, 1 - (1-final_epsilon) / epsilon_anneal_time * time_step)
 

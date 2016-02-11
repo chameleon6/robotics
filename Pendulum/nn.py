@@ -2,9 +2,10 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-def s_const_grid(s):
+def s_const_grid(s, xr):
+    s = np.array(s)
     n = 10000
-    xs = np.linspace(-1,1,n)[:,np.newaxis]
+    xs = np.linspace(xr[0], xr[1], n)[:,np.newaxis]
     return xs, np.concatenate((np.ones((n,1)) * s[np.newaxis,:], xs), 1)
 
 class ControlNN:
@@ -61,7 +62,7 @@ class ControlNN:
         self.sa_query = tf.concat(1, [self.s_query, self.a_query])
         self.q_query = q_from_input(self.sa_query)
 
-        query_opt = tf.train.AdamOptimizer(0.001)
+        query_opt = tf.train.AdamOptimizer(0.1)
         query_grads_and_vars = query_opt.compute_gradients(self.q_query, [self.a_query])
         # list of tuples (gradient, variable).
         query_grads_and_vars[0] = (-query_grads_and_vars[0][0], query_grads_and_vars[0][1])
@@ -95,29 +96,38 @@ class ControlNN:
     def o1_from_sa(self, sa_vals):
         return self.sess.run(self.o1, feed_dict={self.sa_learn: sa_vals, self.keep_prob: 1.0})
 
-    def graph_output(self, s):
+    def graph_output(self, s, xr):
         assert self.n_a == 1
-        xs, inputs = s_const_grid(s)
+        xs, inputs = s_const_grid(s, xr)
         outputs = self.q_from_sa(inputs)
         plt.plot(xs, outputs)
         plt.show()
-        return outputs
 
-    def get_best_a(self, s, tolerance=0.001):
+    def get_best_a(self, s, min_a, max_a, tolerance=0.01):
+        def get_a():
+            return self.sess.run(self.a_query)
+
         # TODO: initialize a intelligently
+        self.sess.run(self.a_query.assign(np.zeros([1, self.n_a])))
+
         count = 0
+        min_iters = 5
         old_q = self.q_query_from_s(s)
+        old_a = None
         while True:
             self.sess.run(self.apply_query_grads, feed_dict={self.s_query: s[np.newaxis,:], self.keep_prob: 1.0})
             new_q = self.q_query_from_s(s)
-            #print count, old_q, new_q
             count += 1
-            if np.abs(new_q - old_q) < tolerance:
-                break
+            a = get_a()
+            print count, old_a, a
+            if count > min_iters:
+                if a > max_a or a < min_a or np.linalg.norm(a - old_a) < tolerance:
+                    break
+            old_a = a
             old_q = new_q
 
-        #print "iterations until max_a converged:", count
-        return self.sess.run(self.a_query), new_q
+        print "iterations until max_a converged:", count
+        return old_a, new_q
 
     def mse_q(self, sa_vals, y_vals):
         return self.sess.run(self.learn_error,

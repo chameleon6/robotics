@@ -30,7 +30,12 @@ class ControlNN:
         self.n_1 = n_hidden
         self.n_2 = n_hidden
         self.one_layer_only = True
+        self.n_minibatch = 20
+        self.max_a_min_iters = 5
+        self.max_torques = np.array([[3.0]], dtype='float32')
+        self.min_torques = np.array([[-3.0]], dtype='float32')
 
+        self.sess = tf.Session()
         self.keep_prob = tf.placeholder('float')
         self.sa_learn = tf.placeholder('float', shape=[None,self.n_sa])
         self.W_sa_1 = unif_fanin_mat([self.n_sa, self.n_1], 'W_sa_1')
@@ -57,20 +62,30 @@ class ControlNN:
         self.learn_error = tf.reduce_mean(tf.square(self.y_learn - self.q_learn))
         self.learn_opt = tf.train.AdamOptimizer(0.001).minimize(self.learn_error)
 
-        self.s_query = tf.placeholder('float', shape=[1, self.n_s])
-        self.a_query = unif_fanin_mat([1, self.n_a], 'a_query')
-        self.sa_query = tf.concat(1, [self.s_query, self.a_query])
-        self.q_query = q_from_input(self.sa_query)
+        def query_setup(n_sample):
+            s_query = tf.placeholder('float', shape=[n_sample, self.n_s])
+            a_query = unif_fanin_mat([n_sample, self.n_a], 'a_query')
+            min_cutoff = tf.matmul(np.ones((n_sample, 1), dtype='float32'), self.min_torques)
+            max_cutoff = tf.matmul(np.ones((n_sample, 1), dtype='float32'), self.max_torques)
+            print "min cutoff:", self.sess.run(min_cutoff)
+            print "max cutoff:", self.sess.run(max_cutoff)
+            a_query_clipped = tf.minimum(tf.maximum(min_cutoff, a_query), max_cutoff)
 
-        query_opt = tf.train.AdamOptimizer(0.1)
-        query_grads_and_vars = query_opt.compute_gradients(self.q_query, [self.a_query])
-        # list of tuples (gradient, variable).
-        query_grads_and_vars[0] = (-query_grads_and_vars[0][0], query_grads_and_vars[0][1])
-        self.apply_query_grads = query_opt.apply_gradients(query_grads_and_vars)
+            sa_query = tf.concat(1, [s_query, a_query_clipped])
+            q_query = q_from_input(sa_query)
+
+            query_opt = tf.train.AdamOptimizer(0.01)
+            query_grads_and_vars = query_opt.compute_gradients(tf.reduce_mean(q_query), [a_query])
+            # list of tuples (gradient, variable).
+            query_grads_and_vars[0] = (-query_grads_and_vars[0][0], query_grads_and_vars[0][1])
+            apply_query_grads = query_opt.apply_gradients(query_grads_and_vars)
+            return s_query, a_query, sa_query, q_query, apply_query_grads
+
+        self.s_query, self.a_query, self.sa_query, self.q_query, self.apply_query_grads = query_setup(1)
+        self.s_query_p, self.a_query_p, self.sa_query_p, self.q_query_p, \
+                self.apply_query_grads_p = query_setup(self.n_minibatch)
 
         self.saver = tf.train.Saver(self.name_var_dict)
-
-        self.sess = tf.Session()
 
         self.init_op = tf.initialize_all_variables()
         self.sess.run(self.init_op)
@@ -93,6 +108,9 @@ class ControlNN:
     def q_query_from_s(self, s_vals):
         return self.sess.run(self.q_query, feed_dict={self.s_query: s_vals[np.newaxis,:], self.keep_prob: 1.0})
 
+    def q_query_from_s_p(self, s_vals):
+        return self.sess.run(self.q_query_p, feed_dict={self.s_query_p: s_vals, self.keep_prob: 1.0})
+
     def o1_from_sa(self, sa_vals):
         return self.sess.run(self.o1, feed_dict={self.sa_learn: sa_vals, self.keep_prob: 1.0})
 
@@ -103,31 +121,48 @@ class ControlNN:
         plt.plot(xs, outputs)
         plt.show()
 
-    def get_best_a(self, s, min_a, max_a, tolerance=0.01):
-        def get_a():
-            return self.sess.run(self.a_query)
+    def get_best_a_p(self, s, tolerance=0.001):
+        self.sess.run(self.a_query_p.assign(np.zeros([self.n_minibatch, self.n_a])))
+        count = 0
+        old_a = None
+        while True:
+            self.sess.run(self.apply_query_grads_p, feed_dict={self.s_query_p: s, self.keep_prob: 1.0})
+            count += 1
+            a = self.sess.run(self.a_query_p)
+            if count > self.max_a_min_iters:
+                # print 'old a'
+                # print old_a
+                # print 'a'
+                # print a
+                # print 'delta'
+                # print a - old_a
+                # print
+                if np.linalg.norm(a - old_a) < tolerance * np.sqrt(self.n_minibatch):
+                    print 'max_a_p converge_count', count
+                    return a, self.q_query_from_s_p(s)
+            old_a = a
+
+    def get_best_a(self, s, tolerance=0.01):
 
         # TODO: initialize a intelligently
         self.sess.run(self.a_query.assign(np.zeros([1, self.n_a])))
 
         count = 0
-        min_iters = 5
         old_q = self.q_query_from_s(s)
         old_a = None
         while True:
             self.sess.run(self.apply_query_grads, feed_dict={self.s_query: s[np.newaxis,:], self.keep_prob: 1.0})
             new_q = self.q_query_from_s(s)
             count += 1
-            a = get_a()
+            a = self.sess.run(self.a_query)
             print count, old_a, a
-            if count > min_iters:
-                if a > max_a or a < min_a or np.linalg.norm(a - old_a) < tolerance:
-                    break
+            if count > self.max_a_min_iters:
+                if np.linalg.norm(a - old_a) < tolerance:
+                    print "max_a converge count:", count
+                    return a, new_q
             old_a = a
             old_q = new_q
 
-        print "iterations until max_a converged:", count
-        return old_a, new_q
 
     def mse_q(self, sa_vals, y_vals):
         return self.sess.run(self.learn_error,

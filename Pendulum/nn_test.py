@@ -1,3 +1,4 @@
+# function fitting test
 from nn import *
 import time
 import sys

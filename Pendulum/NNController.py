@@ -32,6 +32,8 @@ print 'saving to', save_path
 
 max_torque = 3
 
+train_mod = 10
+
 def random_action():
     return np.random.uniform(-max_torque,max_torque)
 
@@ -52,7 +54,7 @@ while True:
         continue
 
     print "iter", time_step, "epsilon", epsilon, "times_trained", times_trained
-    print lines
+    #print lines
     reward_str = lines[0].rstrip()
     reward = float(reward_str)
 
@@ -68,30 +70,36 @@ while True:
         current_net.save_model(transfer_path)
         old_net.load_model(transfer_path)
 
-    action = current_net.get_best_a(state, -max_torque, max_torque)[0][0][0] \
+    action = current_net.get_best_a(state)[0][0][0] \
             if np.random.random() > epsilon else random_action()
     print 'action', action
 
-    if ready_to_train:
+    if ready_to_train and time_step % train_mod == 0:
         ts = transitions.random_sample(minibatch_size)
-        print ts
+        #print ts
         def y_from_sample(sample):
             #start = time.time()
-            y = sample[2] + gamma * old_net.get_best_a(sample[3], -max_torque, max_torque)[1][0][0]
+            y = sample[2] + gamma * old_net.get_best_a(sample[3])[1][0][0]
             #print "maximizing time", time.time() - start
             return y
 
-        tic('total max time')
-        ys = np.array(map(y_from_sample, ts))[:, np.newaxis]
-        toc('total max time')
+        # tic('total max time')
+        # ys = np.array(map(y_from_sample, ts))[:, np.newaxis]
+        # toc('total max time')
+
+        tic('total max time p')
+        rs = np.array([t[2] for t in ts])[:, np.newaxis]
+        new_states = np.array([t[3] for t in ts])
+        ys = rs + gamma * old_net.get_best_a_p(new_states)[1]
+        toc('total max time p')
 
         sa = np.array([np.append(t[0], t[1]) for t in ts])
 
-        print 'ys'
-        print ys
-        print 'sa'
-        print sa
-        print
+        # print 'ys'
+        # print ys
+        # print 'sa'
+        # print sa
+        # print
 
         tic('train time')
         current_net.train(sa, ys)
@@ -106,6 +114,3 @@ while True:
     time_step += 1
     last_state = state
     last_action = action
-
-    if time_step % 10 == 0:
-        print transitions

@@ -1,10 +1,10 @@
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
+from utils import *
 
-def s_const_grid(s, xr):
+def s_const_grid(s, xr, n=10000):
     s = np.array(s)
-    n = 10000
     xs = np.linspace(xr[0], xr[1], n)[:,np.newaxis]
     return xs, np.concatenate((np.ones((n,1)) * s[np.newaxis,:], xs), 1)
 
@@ -23,6 +23,7 @@ class ControlNN:
             initial = tf.constant(0.1, shape=shape)
             return tf.Variable(initial, name=name)
 
+        conf = read_conf('pendulum.conf')
         self.n_s = 2
         self.n_a = 1
         self.n_sa = 3
@@ -30,10 +31,11 @@ class ControlNN:
         self.n_1 = n_hidden
         self.n_2 = n_hidden
         self.one_layer_only = True
-        self.n_minibatch = 20
+        self.n_minibatch = conf['minibatch_size']
         self.max_a_min_iters = 5
-        self.max_torques = np.array([[3.0]], dtype='float32')
-        self.min_torques = np.array([[-3.0]], dtype='float32')
+        max_abs_torque = conf['max_torque']
+        self.max_torques = np.array([[max_abs_torque]], dtype='float32')
+        self.min_torques = np.array([[max_abs_torque]], dtype='float32')
 
         self.sess = tf.Session()
         self.keep_prob = tf.placeholder('float')
@@ -67,14 +69,14 @@ class ControlNN:
             a_query = unif_fanin_mat([n_sample, self.n_a], 'a_query')
             min_cutoff = tf.matmul(np.ones((n_sample, 1), dtype='float32'), self.min_torques)
             max_cutoff = tf.matmul(np.ones((n_sample, 1), dtype='float32'), self.max_torques)
-            print "min cutoff:", self.sess.run(min_cutoff)
-            print "max cutoff:", self.sess.run(max_cutoff)
+            # print "min cutoff:", self.sess.run(min_cutoff)
+            # print "max cutoff:", self.sess.run(max_cutoff)
             a_query_clipped = tf.minimum(tf.maximum(min_cutoff, a_query), max_cutoff)
 
             sa_query = tf.concat(1, [s_query, a_query_clipped])
             q_query = q_from_input(sa_query)
 
-            query_opt = tf.train.AdamOptimizer(0.01)
+            query_opt = tf.train.AdamOptimizer(0.1)
             query_grads_and_vars = query_opt.compute_gradients(tf.reduce_mean(q_query), [a_query])
             # list of tuples (gradient, variable).
             query_grads_and_vars[0] = (-query_grads_and_vars[0][0], query_grads_and_vars[0][1])
@@ -121,7 +123,15 @@ class ControlNN:
         plt.plot(xs, outputs)
         plt.show()
 
-    def get_best_a_p(self, s, tolerance=0.001):
+    # first coord constant
+    def graph_max_qs(self, sr):
+        assert self.n_s == 2
+        xs, inputs = s_const_grid([0.0], sr, self.n_minibatch)
+        outputs = self.get_best_a_p(inputs)[1]
+        plt.plot(xs, outputs)
+        plt.show()
+
+    def get_best_a_p(self, s, tolerance=0.01):
         self.sess.run(self.a_query_p.assign(np.zeros([self.n_minibatch, self.n_a])))
         count = 0
         old_a = None
@@ -155,7 +165,7 @@ class ControlNN:
             new_q = self.q_query_from_s(s)
             count += 1
             a = self.sess.run(self.a_query)
-            print count, old_a, a
+            #print count, old_a, a
             if count > self.max_a_min_iters:
                 if np.linalg.norm(a - old_a) < tolerance:
                     print "max_a converge count:", count

@@ -21,27 +21,33 @@ classdef NNController < DrakeSystem
     %   x0 = [2; 0];
     % end
 
-    function ts = getSampleTime(obj)
-      ts = [0.01 0; 0 0];
-    end
+    % function ts = getSampleTime(obj)
+    %   ts = [0.01; 0];
+    % end
 
     function r = reward(obj,x)
-      %r = -(x(1) - pi)^2;
-      if cos(x(1)) < 0
-        r = 1;
-      else
-        r = 0;
-      end
+      r = -100*(x(1) - pi)^2;
+
+      %if cos(x(1)) < -0.8
+      %  r = 1;
+      %else
+      %  r = 0;
+      %end
+
+      %r = -100*x(2)^2;
     end
 
-    function write_state(obj,x)
+    function write_state(obj,x,t)
       f = fopen(obj.matlab_state_file, 'w');
+      x_new = x;
+      x_new(1) = mod(x(1), pi);
       fprintf(f, '%d\n', obj.reward(x));
-      fprintf(f, '%d ', x);
+      fprintf(f, '%d ', x_new);
       fprintf(f, '\n');
+      fprintf(f, '%d\n', t);
       fclose(f);
 
-      %debug
+      % %debug
       % fprintf('writing state\n');
       % fprintf('%d\n', obj.reward(x));
       % fprintf('%d ', x);
@@ -53,6 +59,7 @@ classdef NNController < DrakeSystem
       while true
         while exist(obj.python_action_file, 'file') ~= 2
           if cputime - start_time > 10
+            cputime - start_time
             error('timeout')
           end
           continue;
@@ -87,12 +94,13 @@ classdef NNController < DrakeSystem
       %     fprintf(1,'%20s = %f\n',coordinates{i},x(i));
       %   end
       % end
-      if mod(int16(t*100),5) == 0
-        t
-      end
+      % if mod(int16(t*100),5) == 0
+      %   t
+      % end
 
-      obj.write_state(x);
-      u = obj.get_action();
+      t, x
+      obj.write_state(x,t);
+      u = obj.get_action()
 
     end
   end

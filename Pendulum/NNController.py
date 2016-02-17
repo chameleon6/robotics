@@ -10,29 +10,36 @@ from TransitionContainer import TransitionContainer
 matlab_state_file = os.getcwd() + '/matlab_state_file.out'
 python_action_file = os.getcwd() + '/python_action_file.out'
 
+transitions = TransitionContainer()
+
+conf = read_conf('pendulum.conf')
+
+max_torque = conf['max_torque']
+old_net_update_time = conf['old_net_update_time']
+min_train_gap = conf['min_train_gap']
+final_epsilon = conf['final_epsilon']
+epsilon_anneal_time = conf['epsilon_anneal_time']
+minibatch_size = conf['minibatch_size']
+gamma = conf['gamma']
+sim_dt = conf['sim_dt']
+
+epsilon = 1.0
+last_old_net_update_time = 0.0
+net_update_count = 0
+last_train_time = 0.0
+ready_to_train = False
 time_step = 1
 times_trained = 0
 last_state = None
 last_action = None
-transitions = TransitionContainer()
+train_t = 0.0
 
 current_net = ControlNN()
 old_net = ControlNN()
-old_net_update_time = 100
-epsilon = 1.0
-final_epsilon = 0.1
-epsilon_anneal_time = 1000
-minibatch_size = 20
-gamma = 0.99
-ready_to_train = False
 
 transfer_path = '/tmp/model_transfer'
 save_path = 'models/model_%s.out' % (int(time.time() * 10000) % 100000)
 print 'saving to', save_path
-
-max_torque = 3
-
-train_mod = 10
 
 def random_action():
     return np.random.uniform(-max_torque,max_torque)
@@ -50,38 +57,53 @@ while True:
     f = open(matlab_state_file, 'r')
     lines = f.readlines()
     f.close()
-    if len(lines) < 2: # file isn't fully written yet
+    if len(lines) < 3: # file isn't fully written yet
         continue
 
-    print "iter", time_step, "epsilon", epsilon, "times_trained", times_trained
     #print lines
     reward_str = lines[0].rstrip()
     reward = float(reward_str)
 
     state_strs = lines[1].rstrip().split(' ')
     state = np.array(map(float, state_strs))
+
+    sim_t = float(lines[2].rstrip())
+    train_t += sim_dt
+
     os.remove(matlab_state_file)
 
+    print 'iter', time_step, 'train_t', train_t, 'sim_t', sim_t, 'epsilon', epsilon, 'times_trained', times_trained,\
+        'net_update_count', net_update_count
+
+    tic('total')
     if last_state != None:
         transitions.append((last_state, last_action, reward, state))
 
-    if time_step % old_net_update_time == 0:
+    if train_t - last_old_net_update_time > old_net_update_time:
         ready_to_train = True
+        tic('net transfer')
         current_net.save_model(transfer_path)
         old_net.load_model(transfer_path)
+        last_old_net_update_time = train_t
+        net_update_count += 1
+        toc('net transfer')
 
-    action = current_net.get_best_a(state)[0][0][0] \
-            if np.random.random() > epsilon else random_action()
-    print 'action', action
+    action = random_action()
+    if np.random.random() > epsilon:
+        tic('action')
+        action = current_net.get_best_a(state)[0][0][0]
+        toc('action')
 
-    if ready_to_train and time_step % train_mod == 0:
+    #print 'action', action
+
+    if ready_to_train and train_t - last_train_time > min_train_gap:
         ts = transitions.random_sample(minibatch_size)
         #print ts
-        def y_from_sample(sample):
-            #start = time.time()
-            y = sample[2] + gamma * old_net.get_best_a(sample[3])[1][0][0]
-            #print "maximizing time", time.time() - start
-            return y
+        # def y_from_sample(sample):
+        #     #start = time.time()
+        #     y = sample[2] + gamma * old_net.get_best_a(sample[3])[1][0][0]
+        #     #print "maximizing time", time.time() - start
+        #     return y
 
         # tic('total max time')
         # ys = np.array(map(y_from_sample, ts))[:, np.newaxis]
@@ -105,7 +127,8 @@ while True:
         current_net.train(sa, ys)
         toc('train time')
         times_trained += 1
-        epsilon = max(final_epsilon, 1 - (1-final_epsilon) / epsilon_anneal_time * time_step)
+        epsilon = max(final_epsilon, 1 - (1-final_epsilon) / epsilon_anneal_time * train_t)
+        last_train_time = train_t
 
     f = open(python_action_file, 'w')
     f.write('%s\n' % action)
@@ -114,3 +137,5 @@ while True:
     time_step += 1
     last_state = state
     last_action = action
+    toc('total')
+    print

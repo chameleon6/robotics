@@ -1,20 +1,37 @@
 import time
+import numpy as np
 
-start_times = {}
+np.set_printoptions(precision=3)
+np.set_printoptions(suppress=True)
 
-def tic(name):
-    start_times[name] = time.time()
+class Profiler:
 
-def toc(name, thresh=0.2):
-    ans = time.time() - start_times[name]
-    if ans > thresh:
-        print "Global profile:", name, "took", ans, "seconds"
+    def __init__(self):
+        self.start_times = {}
+        self.runtime_stats = {}
 
-def profile_function(f, *args):
-    start_time = time.time()
-    output = f(*args)
-    print "Function profile:", f.__name__, "took", time.time() - start_time, "seconds"
-    return output
+    def tic(self, name):
+        self.start_times[name] = time.time()
+
+    def toc(self, name, thresh=0.2):
+        ans = time.time() - self.start_times[name]
+        if name not in self.runtime_stats:
+            self.runtime_stats[name] = []
+        self.runtime_stats[name].append(ans)
+
+        if ans > thresh:
+            print "Global profile:", name, "took", ans, "seconds"
+
+    def profile_function(self, f, *args):
+        start_time = time.time()
+        output = f(*args)
+        print "Function profile:", f.__name__, "took", time.time() - start_time, "seconds"
+        return output
+
+    def print_time_stats(self):
+        print "Aggregate runtime stats:"
+        for name,l in enumerate(self.runtime_stats):
+            print name, "took avg time", sum(l)/len(l), "for", len(l), "runs"
 
 def read_conf(file_name):
     ans = {}
@@ -31,6 +48,6 @@ def read_conf(file_name):
                 ans[a[0]] = int(a[2])
 
 
-    print 'conf read:'
+    print 'conf read:', file_name
     print ans
     return ans

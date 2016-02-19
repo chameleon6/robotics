@@ -7,6 +7,9 @@ from utils import *
 from nn import ControlNN
 from TransitionContainer import TransitionContainer
 
+profiler = Profiler()
+profiler.tic('total controller run time')
+
 matlab_state_file = os.getcwd() + '/matlab_state_file.out'
 python_action_file = os.getcwd() + '/python_action_file.out'
 
@@ -22,8 +25,11 @@ epsilon_anneal_time = conf['epsilon_anneal_time']
 minibatch_size = conf['minibatch_size']
 gamma = conf['gamma']
 sim_dt = conf['sim_dt']
+start_epsilon = conf['start_epsilon']
 
-epsilon = 1.0
+assert start_epsilon >= final_epsilon
+
+epsilon = start_epsilon
 last_old_net_update_time = 0.0
 net_update_count = 0
 last_train_time = 0.0
@@ -34,8 +40,10 @@ last_state = None
 last_action = None
 train_t = 0.0
 
-current_net = ControlNN()
-old_net = ControlNN()
+#load_path = 'models/model_31275.out'
+load_path = 'models/model_77422.out'
+current_net = ControlNN(load_path)
+old_net = ControlNN(load_path)
 
 transfer_path = '/tmp/model_transfer'
 save_path = 'models/model_%s.out' % (int(time.time() * 10000) % 100000)
@@ -51,6 +59,7 @@ while True:
         if time.time() - start_time > 10:
             print "timeout"
             current_net.save_model(save_path)
+            profiler.toc('total controller run time')
             sys.exit()
         pass
 
@@ -75,24 +84,24 @@ while True:
     print 'iter', time_step, 'train_t', train_t, 'sim_t', sim_t, 'epsilon', epsilon, 'times_trained', times_trained,\
         'net_update_count', net_update_count
 
-    tic('total')
+    profiler.tic('total')
     if last_state != None:
         transitions.append((last_state, last_action, reward, state))
 
     if train_t - last_old_net_update_time > old_net_update_time:
         ready_to_train = True
-        tic('net transfer')
+        profiler.tic('net transfer')
         current_net.save_model(transfer_path)
         old_net.load_model(transfer_path)
         last_old_net_update_time = train_t
         net_update_count += 1
-        toc('net transfer')
+        profiler.toc('net transfer')
 
     action = random_action()
     if np.random.random() > epsilon:
-        tic('action')
+        profiler.tic('action')
         action = current_net.get_best_a(state)[0][0][0]
-        toc('action')
+        profiler.toc('action')
 
     #print 'action', action
 
@@ -105,15 +114,15 @@ while True:
         #     #print "maximizing time", time.time() - start
         #     return y
 
-        # tic('total max time')
+        # profiler.tic('total max time')
         # ys = np.array(map(y_from_sample, ts))[:, np.newaxis]
-        # toc('total max time')
+        # profiler.toc('total max time')
 
-        tic('total max time p')
+        profiler.tic('total max time p')
         rs = np.array([t[2] for t in ts])[:, np.newaxis]
         new_states = np.array([t[3] for t in ts])
         ys = rs + gamma * old_net.get_best_a_p(new_states)[1]
-        toc('total max time p')
+        profiler.toc('total max time p')
 
         sa = np.array([np.append(t[0], t[1]) for t in ts])
 
@@ -123,11 +132,11 @@ while True:
         # print sa
         # print
 
-        tic('train time')
+        profiler.tic('train time')
         current_net.train(sa, ys)
-        toc('train time')
+        profiler.toc('train time')
         times_trained += 1
-        epsilon = max(final_epsilon, 1 - (1-final_epsilon) / epsilon_anneal_time * train_t)
+        epsilon = max(final_epsilon, start_epsilon - (start_epsilon-final_epsilon) / epsilon_anneal_time * train_t)
         last_train_time = train_t
 
     f = open(python_action_file, 'w')
@@ -137,5 +146,5 @@ while True:
     time_step += 1
     last_state = state
     last_action = action
-    toc('total')
+    profiler.toc('total')
     print

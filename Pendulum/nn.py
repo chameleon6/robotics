@@ -4,13 +4,14 @@ import matplotlib.pyplot as plt
 from utils import *
 
 def s_const_grid(s, xr, n=10000):
+    # [[s x_1], [s x_2], ..., [s x_n]]
     s = np.array(s)
     xs = np.linspace(xr[0], xr[1], n)[:,np.newaxis]
     return xs, np.concatenate((np.ones((n,1)) * s[np.newaxis,:], xs), 1)
 
 class ControlNN:
     def __init__(self, load_file=None):
-        tf_random_seed = 6
+        tf_random_seed = 40
         nonlinearity = tf.nn.relu
         self.keep_prob_train_val = 1.0
 
@@ -23,7 +24,7 @@ class ControlNN:
             initial = tf.constant(0.1, shape=shape)
             return tf.Variable(initial, name=name)
 
-        conf = read_conf('pendulum.conf')
+        conf = read_conf('test.conf')
         self.n_s = 2
         self.n_a = 1
         self.n_sa = 3
@@ -35,7 +36,7 @@ class ControlNN:
         self.max_a_min_iters = 5
         max_abs_torque = conf['max_torque']
         self.max_torques = np.array([[max_abs_torque]], dtype='float32')
-        self.min_torques = np.array([[max_abs_torque]], dtype='float32')
+        self.min_torques = np.array([[-max_abs_torque]], dtype='float32')
 
         self.sess = tf.Session()
         self.keep_prob = tf.placeholder('float')
@@ -123,6 +124,20 @@ class ControlNN:
         plt.plot(xs, outputs)
         plt.show()
 
+    def manual_max_a(self, s, xr):
+        assert self.n_a == 1
+        xs, inputs = s_const_grid(s, xr)
+        outputs = self.q_from_sa(inputs).flatten()
+        best_input = np.argmax(outputs)
+        return [inputs[best_input][-1], outputs[best_input]]
+
+    def manual_max_a_p(self, s, xr):
+        assert self.n_a == 1
+        ans = []
+        for i in s:
+            ans.append(self.manual_max_a(i, xr))
+        return np.array(ans)
+
     # first coord constant
     def graph_max_qs(self, sr):
         assert self.n_s == 2
@@ -131,8 +146,12 @@ class ControlNN:
         plt.plot(xs, outputs)
         plt.show()
 
-    def get_best_a_p(self, s, tolerance=0.01):
-        self.sess.run(self.a_query_p.assign(np.zeros([self.n_minibatch, self.n_a])))
+    def get_best_a_p(self, s, init_a=None, tolerance=0.01):
+        #TODO: benchmark different init methods
+        if init_a == None:
+            init_a = np.zeros([self.n_minibatch, self.n_a])
+
+        self.sess.run(self.a_query_p.assign(init_a))
         count = 0
         old_a = None
         while True:
@@ -152,10 +171,12 @@ class ControlNN:
                     return a, self.q_query_from_s_p(s)
             old_a = a
 
-    def get_best_a(self, s, tolerance=0.01):
+    def get_best_a(self, s, init_a=None, tolerance=0.01):
+        # TODO: initialize a intelligently, benchmark
+        if init_a == None:
+            np.zeros([1, self.n_a])
 
-        # TODO: initialize a intelligently
-        self.sess.run(self.a_query.assign(np.zeros([1, self.n_a])))
+        self.sess.run(self.a_query.assign(init_a))
 
         count = 0
         old_q = self.q_query_from_s(s)

@@ -30,7 +30,7 @@ class Profiler:
 
     def print_time_stats(self):
         print "Aggregate runtime stats:"
-        for name,l in enumerate(self.runtime_stats):
+        for name,l in self.runtime_stats.iteritems():
             print name, "took avg time", sum(l)/len(l), "for", len(l), "runs"
 
 def read_conf(file_name):

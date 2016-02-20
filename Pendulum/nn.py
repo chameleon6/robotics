@@ -36,7 +36,9 @@ class ControlNN:
         self.max_a_min_iters = 5
         max_abs_torque = conf['max_torque']
         self.max_torques = np.array([[max_abs_torque]], dtype='float32')
+        self.max_torques_p = np.ones((self.n_minibatch,1)) * np.array([[max_abs_torque]], dtype='float32')
         self.min_torques = np.array([[-max_abs_torque]], dtype='float32')
+        self.min_torques_p = np.ones((self.n_minibatch,1)) * np.array([[-max_abs_torque]], dtype='float32')
 
         self.sess = tf.Session()
         self.keep_prob = tf.placeholder('float')
@@ -77,7 +79,7 @@ class ControlNN:
             sa_query = tf.concat(1, [s_query, a_query_clipped])
             q_query = q_from_input(sa_query)
 
-            query_opt = tf.train.AdamOptimizer(0.1)
+            query_opt = tf.train.AdamOptimizer(0.2)
             query_grads_and_vars = query_opt.compute_gradients(tf.reduce_mean(q_query), [a_query])
             # list of tuples (gradient, variable).
             query_grads_and_vars[0] = (-query_grads_and_vars[0][0], query_grads_and_vars[0][1])
@@ -129,7 +131,7 @@ class ControlNN:
         xs, inputs = s_const_grid(s, xr)
         outputs = self.q_from_sa(inputs).flatten()
         best_input = np.argmax(outputs)
-        return [inputs[best_input][-1], outputs[best_input]]
+        return np.array([inputs[best_input][-1], outputs[best_input]])
 
     def manual_max_a_p(self, s, xr):
         assert self.n_a == 1
@@ -146,54 +148,73 @@ class ControlNN:
         plt.plot(xs, outputs)
         plt.show()
 
-    def get_best_a_p(self, s, init_a=None, tolerance=0.01):
+    def get_best_a_p(self, s, is_p, num_tries=1, init_a=None, tolerance=0.01):
         #TODO: benchmark different init methods
-        if init_a == None:
-            init_a = np.zeros([self.n_minibatch, self.n_a])
 
-        self.sess.run(self.a_query_p.assign(init_a))
-        count = 0
-        old_a = None
-        while True:
-            self.sess.run(self.apply_query_grads_p, feed_dict={self.s_query_p: s, self.keep_prob: 1.0})
-            count += 1
-            a = self.sess.run(self.a_query_p)
-            if count > self.max_a_min_iters:
-                # print 'old a'
-                # print old_a
-                # print 'a'
-                # print a
-                # print 'delta'
-                # print a - old_a
-                # print
-                if np.linalg.norm(a - old_a) < tolerance * np.sqrt(self.n_minibatch):
-                    print 'max_a_p converge_count', count
-                    return a, self.q_query_from_s_p(s)
-            old_a = a
+        assert (is_p and len(s.shape) == 2 and s.shape[0] == self.n_minibatch) or (not is_p and len(s.shape) == 1)
 
-    def get_best_a(self, s, init_a=None, tolerance=0.01):
-        # TODO: initialize a intelligently, benchmark
-        if init_a == None:
-            np.zeros([1, self.n_a])
+        ans_a, ans_q = None, None
+        def inner_p(init_a):
+            if init_a == None:
+                init_a = self.min_torques_p + (self.max_torques_p - self.min_torques_p) * \
+                        np.random.random((self.n_minibatch, self.n_a))
+                #np.zeros([self.n_minibatch, self.n_a])
 
-        self.sess.run(self.a_query.assign(init_a))
+            self.sess.run(self.a_query_p.assign(init_a))
+            count = 0
+            old_a = None
+            while True:
+                self.sess.run(self.apply_query_grads_p, feed_dict={self.s_query_p: s, self.keep_prob: 1.0})
+                count += 1
+                a = self.sess.run(self.a_query_p)
+                if count > self.max_a_min_iters:
+                    # print 'old a'
+                    # print old_a
+                    # print 'a'
+                    # print a
+                    # print 'delta'
+                    # print a - old_a
+                    # print
+                    if np.linalg.norm(a - old_a) < tolerance * np.sqrt(self.n_minibatch):
+                        print 'max_a_p converge_count', count
+                        return a, self.q_query_from_s_p(s)
+                old_a = a
 
-        count = 0
-        old_q = self.q_query_from_s(s)
-        old_a = None
-        while True:
-            self.sess.run(self.apply_query_grads, feed_dict={self.s_query: s[np.newaxis,:], self.keep_prob: 1.0})
-            new_q = self.q_query_from_s(s)
-            count += 1
-            a = self.sess.run(self.a_query)
-            #print count, old_a, a
-            if count > self.max_a_min_iters:
-                if np.linalg.norm(a - old_a) < tolerance:
-                    print "max_a converge count:", count
-                    return a, new_q
-            old_a = a
-            old_q = new_q
+        def inner(init_a):
+            if init_a == None:
+                init_a = np.zeros([1, self.n_a])
 
+            self.sess.run(self.a_query.assign(init_a))
+
+            count = 0
+            #old_q = self.q_query_from_s(s)
+            old_a = None
+            while True:
+                self.sess.run(self.apply_query_grads, feed_dict={self.s_query: s[np.newaxis,:], self.keep_prob: 1.0})
+                new_q = self.q_query_from_s(s)
+                count += 1
+                a = self.sess.run(self.a_query)
+                #print count, old_a, a
+                if count > self.max_a_min_iters:
+                    if np.linalg.norm(a - old_a) < tolerance:
+                        print "max_a converge count:", count
+                        return a, new_q
+                old_a = a
+                #old_q = new_q
+
+        inner_function = inner_p if is_p else inner
+
+        for i in range(num_tries):
+            a, q = inner_function(init_a) if i == 0 else inner_function(None)
+            if i == 0:
+                ans_a, ans_q = a, q
+                continue
+            for i in range(len(q)):
+                if q[i] > ans_q[i]:
+                    ans_q[i] = q[i]
+                    ans_a[i] = a[i]
+
+        return ans_a, ans_q
 
     def mse_q(self, sa_vals, y_vals):
         return self.sess.run(self.learn_error,

@@ -44,15 +44,18 @@ def ys_from_xs(xs):
 # print net.get_best_a(s)
 # net.graph_output(s, (-5,5))
 
+conf = read_conf('test.conf')
+u_max = conf['max_torque']
 s_max = 50
 s = s_max * np.random.random((20,2))
+s1 = s_max * np.random.random(2)
 print "manual max"
-manual_out = net.manual_max_a_p(s, (-s_max,s_max))
+manual_out = net.manual_max_a_p(s, (-u_max,u_max)).reshape(-1,2)
 print manual_out
 
 profiler.tic('net max')
 print "net max"
-net_out = np.concatenate(net.get_best_a_p(s), 1)
+net_out = np.concatenate(net.get_best_a_p(s, is_p=True, num_tries=5), 1)
 #print net_out
 profiler.toc('net max')
 

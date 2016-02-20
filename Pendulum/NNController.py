@@ -100,7 +100,7 @@ while True:
     action = random_action()
     if np.random.random() > epsilon:
         profiler.tic('action')
-        action = current_net.get_best_a(state)[0][0][0]
+        action = current_net.get_best_a_p(state, is_p=False, num_tries=2)[0][0][0]
         profiler.toc('action')
 
     #print 'action', action
@@ -121,7 +121,7 @@ while True:
         profiler.tic('total max time p')
         rs = np.array([t[2] for t in ts])[:, np.newaxis]
         new_states = np.array([t[3] for t in ts])
-        ys = rs + gamma * old_net.get_best_a_p(new_states)[1]
+        ys = rs + gamma * old_net.get_best_a_p(new_states, is_p=True, num_tries=2)[1]
         profiler.toc('total max time p')
 
         sa = np.array([np.append(t[0], t[1]) for t in ts])

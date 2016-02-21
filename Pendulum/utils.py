@@ -9,6 +9,7 @@ class Profiler:
     def __init__(self):
         self.start_times = {}
         self.runtime_stats = {}
+        self.errs = []
 
     def tic(self, name):
         self.start_times[name] = time.time()
@@ -21,6 +22,9 @@ class Profiler:
 
         if ans > thresh:
             print "Global profile:", name, "took", ans, "seconds"
+
+    def log_err(self, err_msg):
+        self.errs.append(err_msg)
 
     def profile_function(self, f, *args):
         start_time = time.time()

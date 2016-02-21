@@ -9,7 +9,7 @@ profiler = Profiler()
 
 start_time = time.time()
 save_path = None #'/tmp/model.ckpt'
-save_path = 'models/model_62557.out'
+save_path = 'models/model_28917.out'
 net = ControlNN(save_path)
 print "compile time", time.time() - start_time
 
@@ -73,4 +73,3 @@ def max_verification_test():
 
 vis = NetVisualizer(net)
 vis.q_heat_map()
-

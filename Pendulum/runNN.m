@@ -5,7 +5,7 @@ pv = PendulumVisualizer();
 c = NNController(pd); %balanceLQR(pd);
 c = setSampleTime(c, [0.01;0]);
 sys = feedback(pd,c);
-sim_durations = [0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 1 1 1 1 1 1 1 2 2 3];
+sim_durations = [0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 3];
 options = [];
 options.slider = true;
 

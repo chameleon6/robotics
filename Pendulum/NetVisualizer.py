@@ -49,7 +49,11 @@ class NetVisualizer:
 
     def q_heat_map(self):
 
-        y, x = np.mgrid[slice(-3, 3., 2*3./20), slice(0, 2*np.pi, 2*np.pi/20)]
+        #y, x = np.mgrid[slice(-3, 3., 2*3./20), slice(0, 2*np.pi, 2*np.pi/20)]
+        th_r = (1, 4.)
+        th_dot_r = (-0.5, 0.5)
+        y, x = np.mgrid[slice(th_dot_r[0], th_dot_r[1], (th_dot_r[1] - th_dot_r[0])/20),
+                slice(th_r[0], th_r[1], (th_r[1] - th_r[0])/20)]
 
         #z = np.sin(x)**10 + np.cos(10 + y*x) * np.cos(x)
         z = []
@@ -64,11 +68,8 @@ class NetVisualizer:
         z = np.array(z)
         print z
 
-        test_points = [np.array([i,j]) for i in range(0,6) for j in range(-3,3)]
-        print 'sample points:'
-        inds = np.random.choice(range(len(test_points)),6)
-        for ind in inds:
-            i = test_points[ind]
+        for _ in range(6):
+            i = np.array([np.random.uniform(*th_r), np.random.uniform(*th_dot_r)])
             q = self.net.get_best_a_p(i, is_p=False, num_tries=3)[1][0][0]
             print i, q
 

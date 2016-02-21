@@ -28,8 +28,9 @@ classdef NNController < DrakeSystem
     function r = reward(obj,x)
       %r = -100*((x(1) - pi)^2 + x(2)^2)
 
-      if cos(x(1)) < -0.8 & abs(x(2)) < 0.1
+      if cos(x(1)) < -0.9 & abs(x(2)) < 0.1
         r = 100
+        fprintf('good x:%f\n', x);
       else
         r = 0
       end

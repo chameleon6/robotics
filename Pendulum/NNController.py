@@ -62,6 +62,13 @@ print 'saving to', save_path
 def random_action():
     return np.random.uniform(-max_torque,max_torque)
 
+def plot_sim(ind):
+    aa = a_hists[ind]
+    ss = np.array(s_hists[ind])
+    plt.plot(ss)
+    plt.plot(aa)
+    plt.show()
+
 print "ready for matlab"
 while True:
     start_time = time.time()
@@ -108,6 +115,8 @@ while True:
     profiler.tic('total')
     if last_state != None:
         transitions.append((last_state, last_action, reward, state))
+        current_a_hist.append(action)
+        current_s_hist.append(state)
 
     if train_t - last_old_net_update_time > old_net_update_time:
         ready_to_train = True
@@ -132,8 +141,6 @@ while True:
     else:
         action = last_action
 
-    current_a_hist.append(action)
-    current_s_hist.append(state)
     #print 'action', action
 
     if ready_to_train and train_t - last_train_time > min_train_gap:

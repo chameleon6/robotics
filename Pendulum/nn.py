@@ -114,7 +114,7 @@ class ControlNN:
     def o1_from_sa(self, sa_vals):
         return self.sess.run(self.o1, feed_dict={self.sa_learn: sa_vals, self.keep_prob: 1.0})
 
-    def get_best_a_p(self, s, is_p, num_tries=1, init_a=None, tolerance=0.01):
+    def get_best_a_p(self, s, is_p, num_tries, init_a=None, tolerance=0.01):
         #TODO: benchmark different init methods
 
         assert (is_p and len(s.shape) == 2 and s.shape[0] == self.n_minibatch) or (not is_p and len(s.shape) == 1)
@@ -134,7 +134,7 @@ class ControlNN:
                 count += 1
                 a = self.sess.run(self.a_query_clipped_p)
                 if count > self.max_a_min_iters:
-                    if count % 200 == 0:
+                    if count % 1000 == 0:
                         print count
                         print 'old_a'
                         print old_a

@@ -1,9 +1,15 @@
+import matplotlib.pyplot as plt
+from matplotlib.colors import BoundaryNorm
+from matplotlib.ticker import MaxNLocator
+import numpy as np
+
 from nn import *
 from utils import *
 
 class NetVisualizer:
     def __init__(self, net):
         self.net = net
+        self.profiler = Profiler()
 
     def s_const_grid(self, s, xr, n=10000):
         # [[s x_1], [s x_2], ..., [s x_n]]
@@ -40,3 +46,39 @@ class NetVisualizer:
         for i in s:
             ans.append(self.manual_max_a(i, xr))
         return np.array(ans)
+
+    def q_heat_map(self):
+
+        y, x = np.mgrid[slice(-3, 3., 2*3./20), slice(0, 2*np.pi, 2*np.pi/20)]
+
+        #z = np.sin(x)**10 + np.cos(10 + y*x) * np.cos(x)
+        z = []
+        self.profiler.tic('heat map max calculations')
+        for i,j in zip(x,y):
+            s = np.concatenate((i[:,np.newaxis], j[:,np.newaxis]), 1)
+            q = self.net.get_best_a_p(s, is_p=True, num_tries=1)[1].flatten()
+            #print q
+            z.append(q)
+        self.profiler.toc('heat map max calculations')
+
+        z = np.array(z)
+        print z
+
+        test_points = [np.array([i,j]) for i in range(0,6) for j in range(-3,3)]
+        print 'sample points:'
+        inds = np.random.choice(range(len(test_points)),6)
+        for ind in inds:
+            i = test_points[ind]
+            q = self.net.get_best_a_p(i, is_p=False, num_tries=3)[1][0][0]
+            print i, q
+
+        z = z[:-1, :-1]
+        levels = MaxNLocator(nbins=15).tick_values(z.min(), z.max())
+
+        cmap = plt.get_cmap('PiYG')
+        norm = BoundaryNorm(levels, ncolors=cmap.N, clip=True)
+
+        im = plt.pcolormesh(x, y, z, cmap=cmap, norm=norm)
+        plt.colorbar(im)
+        plt.title('pcolormesh with levels')
+        plt.show()

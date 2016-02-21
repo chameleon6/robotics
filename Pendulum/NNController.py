@@ -2,7 +2,7 @@ import numpy as np
 import os
 import sys
 import time
-import copy
+import matplotlib.pyplot as plt
 from utils import *
 from nn import ControlNN
 from TransitionContainer import TransitionContainer
@@ -20,8 +20,10 @@ conf = read_conf('pendulum.conf')
 max_torque = conf['max_torque']
 old_net_update_time = conf['old_net_update_time']
 min_train_gap = conf['min_train_gap']
+min_action_gap = conf['min_action_gap']
 final_epsilon = conf['final_epsilon']
 epsilon_anneal_time = conf['epsilon_anneal_time']
+no_op_time = conf['no_op_time']
 minibatch_size = conf['minibatch_size']
 gamma = conf['gamma']
 sim_dt = conf['sim_dt']
@@ -33,12 +35,20 @@ epsilon = start_epsilon
 last_old_net_update_time = 0.0
 net_update_count = 0
 last_train_time = 0.0
+last_action_time = 0.0
 ready_to_train = False
 time_step = 1
 times_trained = 0
 last_state = None
 last_action = None
-train_t = 0.0
+train_t = -no_op_time
+sim_start_time = train_t - 10
+sim_num = 0
+
+a_hists = []
+current_a_hist= []
+s_hists = []
+current_s_hist= []
 
 #load_path = 'models/model_31275.out'
 load_path = 'models/model_77422.out'
@@ -60,6 +70,7 @@ while True:
             print "timeout"
             current_net.save_model(save_path)
             profiler.toc('total controller run time')
+            profiler.print_time_stats()
             sys.exit()
         pass
 
@@ -77,12 +88,22 @@ while True:
     state = np.array(map(float, state_strs))
 
     sim_t = float(lines[2].rstrip())
+    if sim_t < 0.001 and train_t > sim_start_time + 0.05:
+        print 'new sim', sim_num, 'train_t', train_t
+        sim_start_time = train_t
+        last_state = None
+        sim_num += 1
+        a_hists.append(current_a_hist)
+        s_hists.append(current_s_hist)
+        current_a_hist = []
+        current_s_hist = []
+
     train_t += sim_dt
 
     os.remove(matlab_state_file)
 
-    print 'iter', time_step, 'train_t', train_t, 'sim_t', sim_t, 'epsilon', epsilon, 'times_trained', times_trained,\
-        'net_update_count', net_update_count
+    print 'iter', time_step, 'train_t', train_t, 'sim_t', sim_t, 'epsilon', epsilon, \
+            'times_trained', times_trained, 'net_update_count', net_update_count
 
     profiler.tic('total')
     if last_state != None:
@@ -97,12 +118,22 @@ while True:
         net_update_count += 1
         profiler.toc('net transfer')
 
-    action = random_action()
-    if np.random.random() > epsilon:
-        profiler.tic('action')
-        action = current_net.get_best_a_p(state, is_p=False, num_tries=2)[0][0][0]
-        profiler.toc('action')
+    action = None
+    if train_t < 0.0:
+        action = 0.0
+    elif train_t - last_action_time > min_action_gap:
+        last_action_time = train_t
+        if np.random.random() > epsilon:
+            profiler.tic('action')
+            action = current_net.get_best_a_p(state, is_p=False, num_tries=2)[0][0][0]
+            profiler.toc('action')
+        else:
+            action = random_action()
+    else:
+        action = last_action
 
+    current_a_hist.append(action)
+    current_s_hist.append(state)
     #print 'action', action
 
     if ready_to_train and train_t - last_train_time > min_train_gap:

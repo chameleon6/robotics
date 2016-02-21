@@ -26,13 +26,13 @@ classdef NNController < DrakeSystem
     % end
 
     function r = reward(obj,x)
-      r = -100*(x(1) - pi)^2;
+      %r = -100*((x(1) - pi)^2 + x(2)^2)
 
-      %if cos(x(1)) < -0.8
-      %  r = 1;
-      %else
-      %  r = 0;
-      %end
+      if cos(x(1)) < -0.8 & abs(x(2)) < 0.1
+        r = 100
+      else
+        r = 0
+      end
 
       %r = -100*x(2)^2;
     end
@@ -40,7 +40,7 @@ classdef NNController < DrakeSystem
     function write_state(obj,x,t)
       f = fopen(obj.matlab_state_file, 'w');
       x_new = x;
-      x_new(1) = mod(x(1), pi);
+      x_new(1) = mod(x(1), 2*pi);
       fprintf(f, '%d\n', obj.reward(x));
       fprintf(f, '%d ', x_new);
       fprintf(f, '\n');
@@ -69,7 +69,11 @@ classdef NNController < DrakeSystem
         a = fscanf(f, '%f\n');
         fclose(f);
         if isempty(a)
-          fprintf('python incomplete output')
+          fprintf('python incomplete output\n')
+          if cputime - start_time > 10
+            cputime - start_time
+            error('timeout')
+          end
           continue;
         end
 

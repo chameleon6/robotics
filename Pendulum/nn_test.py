@@ -1,6 +1,7 @@
 # function fitting test and max finding test
 from nn import *
 from utils import *
+from NetVisualizer import NetVisualizer
 import time
 import sys
 
@@ -8,6 +9,7 @@ profiler = Profiler()
 
 start_time = time.time()
 save_path = None #'/tmp/model.ckpt'
+save_path = 'models/model_95599.out'
 net = ControlNN(save_path)
 print "compile time", time.time() - start_time
 
@@ -44,13 +46,15 @@ def ys_from_xs(xs):
 # print net.get_best_a(s)
 # net.graph_output(s, (-5,5))
 
+vis = NetVisualizer(net)
+
 conf = read_conf('test.conf')
 u_max = conf['max_torque']
 s_max = 50
 s = s_max * np.random.random((20,2))
 s1 = s_max * np.random.random(2)
 print "manual max"
-manual_out = net.manual_max_a_p(s, (-u_max,u_max)).reshape(-1,2)
+manual_out = vis.manual_max_a_p(s, (-u_max,u_max)).reshape(-1,2)
 print manual_out
 
 profiler.tic('net max')

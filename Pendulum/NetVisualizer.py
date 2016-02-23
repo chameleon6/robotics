@@ -50,8 +50,8 @@ class NetVisualizer:
     def q_heat_map(self):
 
         #y, x = np.mgrid[slice(-3, 3., 2*3./20), slice(0, 2*np.pi, 2*np.pi/20)]
-        th_r = (1, 4.)
-        th_dot_r = (-0.5, 0.5)
+        th_r = (1, 5.)
+        th_dot_r = (-5., 5.)
         y, x = np.mgrid[slice(th_dot_r[0], th_dot_r[1], (th_dot_r[1] - th_dot_r[0])/20),
                 slice(th_r[0], th_r[1], (th_r[1] - th_r[0])/20)]
 

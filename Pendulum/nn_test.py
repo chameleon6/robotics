@@ -9,7 +9,8 @@ profiler = Profiler()
 
 start_time = time.time()
 save_path = None #'/tmp/model.ckpt'
-save_path = 'models/model_28917.out'
+#save_path = 'models/model_28917.out'
+save_path = 'models/model_50209.out'
 net = ControlNN(save_path)
 print "compile time", time.time() - start_time
 

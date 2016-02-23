@@ -7,5 +7,6 @@
 *autosave
 *out
 *tmp
+*p
 /Pendulum/models
 /Pendulum/test.py

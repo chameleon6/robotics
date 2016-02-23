@@ -22,7 +22,7 @@ class ControlNN:
         self.n_s = 2
         self.n_a = 1
         self.n_sa = 3
-        n_hidden = 20
+        n_hidden = conf['n_hidden']
         self.n_1 = n_hidden
         self.n_2 = n_hidden
         self.one_layer_only = True
@@ -131,7 +131,6 @@ class ControlNN:
             if time.time() - start_time > time_limit:
                 err_msg = 'error!!! max a timeout: s=%s is_p=%s num_tries=%s init_a=%s' % (s, is_p, num_tries, init_a)
                 print err_msg
-                profiler.log_err(err_msg)
                 return True
             return False
 

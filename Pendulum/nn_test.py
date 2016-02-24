@@ -8,16 +8,17 @@ import sys
 profiler = Profiler()
 
 start_time = time.time()
-save_path = None #'/tmp/model.ckpt'
-#save_path = 'models/model_28917.out'
-save_path = 'models/model_50209.out'
+#save_path = 'models/model_20247.out'
+save_path = 'models/model_8688.out'
 net = ControlNN(save_path)
 print "compile time", time.time() - start_time
 
 s = np.array([0.5, 0.5])
-mb_size = 20
+n_minibatch = 200
 num_mb = 1000
 n_test = 1000
+
+vis = NetVisualizer(net)
 
 def ys_from_xs(xs):
     #return np.sum(xs,1)[:,np.newaxis]
@@ -50,14 +51,17 @@ def graph_max_a_test():
     net.graph_output(s, (-5,5))
 
 def max_verification_test():
-    conf = read_conf('test.conf')
+    conf = read_conf('pendulum.conf')
     u_max = conf['max_torque']
-    s_max = 50
-    s = s_max * np.random.random((20,2))
-    s1 = s_max * np.random.random(2)
+    s_max = 10
+    s = s_max * np.random.random((n_minibatch,2))
+    #s1 = s_max * np.random.random(2)
+
+    profiler.tic('manual max')
     print "manual max"
     manual_out = vis.manual_max_a_p(s, (-u_max,u_max)).reshape(-1,2)
     print manual_out
+    profiler.toc('manual max')
 
     profiler.tic('net max')
     print "net max"
@@ -69,8 +73,10 @@ def max_verification_test():
     diff = manual_out - net_out
     #print diff
 
+    summary = np.concatenate((s, net_out, manual_out, diff), 1)
     print 'summary'
-    print np.concatenate((net_out, manual_out, diff), 1)
+    print summary
+    return summary
 
-vis = NetVisualizer(net)
+#summary = max_verification_test()
 vis.q_heat_map()

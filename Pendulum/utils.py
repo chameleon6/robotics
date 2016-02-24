@@ -3,6 +3,7 @@ import numpy as np
 
 np.set_printoptions(precision=3)
 np.set_printoptions(suppress=True)
+np.set_printoptions(linewidth=200)
 
 class Profiler:
 

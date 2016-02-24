@@ -27,12 +27,14 @@ class ControlNN:
         self.n_2 = n_hidden
         self.one_layer_only = True
         self.n_minibatch = conf['minibatch_size']
+        self.n_batches = conf['num_batches']
+        self.n_megabatch = self.n_minibatch * self.n_batches
         self.max_a_min_iters = 5
-        max_abs_torque = conf['max_torque']
-        self.max_torques = np.array([[max_abs_torque]], dtype='float32')
-        self.max_torques_p = np.ones((self.n_minibatch,1)) * np.array([[max_abs_torque]], dtype='float32')
-        self.min_torques = np.array([[-max_abs_torque]], dtype='float32')
-        self.min_torques_p = np.ones((self.n_minibatch,1)) * np.array([[-max_abs_torque]], dtype='float32')
+        self.max_abs_torque = conf['max_torque']
+        self.max_torques = np.array([[self.max_abs_torque]], dtype='float32')
+        self.max_torques_p = np.ones((self.n_megabatch,1)) * np.array([[self.max_abs_torque]], dtype='float32')
+        self.min_torques = np.array([[-self.max_abs_torque]], dtype='float32')
+        self.min_torques_p = np.ones((self.n_megabatch,1)) * np.array([[-self.max_abs_torque]], dtype='float32')
 
         self.sess = tf.Session()
         self.keep_prob = tf.placeholder('float')
@@ -89,7 +91,7 @@ class ControlNN:
         self.s_query, self.a_query, self.a_query_clipped, \
                 self.sa_query, self.q_query, self.apply_query_grads = query_setup(1)
         self.s_query_p, self.a_query_p, self.a_query_clipped_p, \
-                self.sa_query_p, self.q_query_p, self.apply_query_grads_p = query_setup(self.n_minibatch)
+                self.sa_query_p, self.q_query_p, self.apply_query_grads_p = query_setup(self.n_megabatch)
 
         self.saver = tf.train.Saver(self.name_var_dict)
 
@@ -120,10 +122,32 @@ class ControlNN:
     def o1_from_sa(self, sa_vals):
         return self.sess.run(self.o1, feed_dict={self.sa_learn: sa_vals, self.keep_prob: 1.0})
 
+    def s_const_grid(self, s, xr, n=10000):
+        # [[s x_1], [s x_2], ..., [s x_n]]
+        s = np.array(s)
+        xs = np.linspace(xr[0], xr[1], n)[:,np.newaxis]
+        return xs, np.concatenate((np.ones((n,1)) * s[np.newaxis,:], xs), 1)
+
+    def manual_max_a(self, s, xr):
+        assert self.n_a == 1
+        xs, inputs = self.s_const_grid(s, xr)
+        outputs = self.q_from_sa(inputs).flatten()
+        best_input = np.argmax(outputs)
+        return np.array([inputs[best_input][-1], outputs[best_input]])
+
+    def manual_max_a_p(self, s, xr=None):
+        assert self.n_a == 1
+        if xr == None:
+            xr = self.max_abs_torque * np.array([-1.,1])
+        ans = []
+        for i in s:
+            ans.append(self.manual_max_a(i, xr))
+        return np.array(ans)
+
     def get_best_a_p(self, s, is_p, num_tries, init_a=None, tolerance=0.01):
         #TODO: benchmark different init methods
 
-        assert (is_p and len(s.shape) == 2 and s.shape[0] == self.n_minibatch) or (not is_p and len(s.shape) == 1)
+        assert (is_p and len(s.shape) == 2 and s.shape[0] == self.n_megabatch) or (not is_p and len(s.shape) == 1)
 
         ans_a, ans_q = None, None
 
@@ -138,7 +162,7 @@ class ControlNN:
             start_time = time.time()
             if init_a == None:
                 init_a = self.min_torques_p + (self.max_torques_p - self.min_torques_p) * \
-                        np.random.random((self.n_minibatch, self.n_a))
+                        np.random.random((self.n_megabatch, self.n_a)) / 2.0
                 #np.zeros([self.n_minibatch, self.n_a])
 
             self.sess.run(self.a_query_p.assign(init_a))
@@ -150,13 +174,13 @@ class ControlNN:
                 a = self.sess.run(self.a_query_clipped_p)
                 done = False
                 if count > self.max_a_min_iters:
-                    if count % 1000 == 0:
-                        print count
-                        print 'old_a'
-                        print old_a
-                        print 'delta'
-                        print a - old_a
-                    if np.linalg.norm(a - old_a) < tolerance * np.sqrt(self.n_minibatch) or \
+                    #if count % 1000 == 0:
+                    #    print count
+                    #    print 'old_a'
+                    #    print old_a
+                    #    print 'delta'
+                    #    print a - old_a
+                    if np.linalg.norm(a - old_a) < tolerance * np.sqrt(self.n_megabatch) or \
                             check_timeout(start_time, time_limit):
                         print 'max_a_p converge_count', count
                         done = True

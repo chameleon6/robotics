@@ -28,7 +28,7 @@ classdef NNController < DrakeSystem
     function r = reward(obj,x)
       %r = -100*((x(1) - pi)^2 + x(2)^2)
 
-      if cos(x(1)) < -0.9 %& abs(x(2)) < 0.1
+      if cos(x(1)) < -0.9 & abs(x(2)) < 0.2
         r = 1
         fprintf('good x:%f\n', x);
       else
@@ -59,7 +59,7 @@ classdef NNController < DrakeSystem
       start_time = cputime;
       while true
         while exist(obj.python_action_file, 'file') ~= 2
-          if cputime - start_time > 10
+          if cputime - start_time > 60
             cputime - start_time
             error('timeout')
           end
@@ -104,15 +104,16 @@ classdef NNController < DrakeSystem
       % end
 
       %qdd = (u - obj.m*obj.g*obj.lc*sin(q) - obj.b*qd)/obj.I
-      p = obj.p;
-      q = mod(x(1),2*pi);
-      qd = x(2);
-      offset_u = p.m*p.g*p.lc*sin(q) + p.b*qd
-      u=(offset_u - p.I*(qd + sqrt(2)*(q-pi))) + 0.01;
 
-      % t, x
-      % obj.write_state(x,t);
-      % u = obj.get_action()
+      %p = obj.p;
+      %q = mod(x(1),2*pi);
+      %qd = x(2);
+      %offset_u = p.m*p.g*p.lc*sin(q) + p.b*qd
+      %u=(offset_u - p.I*(qd + sqrt(2)*(q-pi))) + 0.01;
+
+      t, x
+      obj.write_state(x,t);
+      u = obj.get_action()
 
     end
   end

@@ -1,4 +1,4 @@
-function runValueIteration
+function mdp = runValueIteration
 
 plant = PendulumPlant;
 options.dt = 1e-2;
@@ -27,14 +27,15 @@ function drawfun(J,PI)
   drawnow;
 end
 
-[J,PI] = valueIteration(mdp,0.001,@drawfun);
+[Jt,PI] = valueIteration(mdp,0.001,@drawfun);
+J = Jt
 
-sys = feedback(plant,PI);
-v = PendulumVisualizer();
-for i=1:5
-  xtraj = simulate(sys,[0,10],0.2*randn(2,1));
-  v.playback(xtraj);
-end
+%sys = feedback(plant,PI);
+%v = PendulumVisualizer();
+%for i=1:1
+%  xtraj = simulate(sys,[0,10],0.2*randn(2,1));
+%  v.playback(xtraj);
+%end
 
 end
 

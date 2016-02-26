@@ -7,7 +7,7 @@ from nn import *
 from utils import *
 
 class NetVisualizer:
-    def __init__(self, net):
+    def __init__(self, net=None):
         self.net = net
         self.profiler = Profiler()
 
@@ -50,10 +50,9 @@ class NetVisualizer:
     def q_heat_map(self):
 
         #y, x = np.mgrid[slice(-3, 3., 2*3./20), slice(0, 2*np.pi, 2*np.pi/20)]
-        th_r = (2.0, 4.2)
-        th_dot_r = (-5.5, 5.5)
-        y, x = np.mgrid[slice(th_dot_r[0], th_dot_r[1], (th_dot_r[1] - th_dot_r[0])/40),
-                slice(th_r[0], th_r[1], (th_r[1] - th_r[0])/40)]
+        th_r = (2.0, 4.2, 40)
+        th_dot_r = (-5.5, 5.5, 40)
+        x, y = self.xy_grid(th_r, th_dot_r)
 
         #z = np.sin(x)**10 + np.cos(10 + y*x) * np.cos(x)
         z = np.zeros((0,40))
@@ -72,15 +71,24 @@ class NetVisualizer:
                 current_buf = np.zeros((0,2))
 
         self.profiler.toc('heat map max calculations')
-
         print z
-
         for _ in range(6):
-            i = np.array([np.random.uniform(*th_r), np.random.uniform(*th_dot_r)])
+            i = np.array([np.random.uniform(th_r[0], th_r[1]),
+                np.random.uniform(th_dot_r[0], th_dot_r[1])])
             q = self.net.get_best_a_p(i, is_p=False, num_tries=3)[1][0][0]
             print i, q
+        self.plot_heat_map(th_r, th_dot_r, z)
 
+
+    def xy_grid(self, xr, yr):
+        assert len(xr) == 3 and len(yr) == 3
+        y, x = np.mgrid[slice(yr[0], yr[1], (yr[1] - yr[0])/yr[2]),
+                slice(xr[0], xr[1], (xr[1] - xr[0])/xr[2])]
+        return x,y
+
+    def plot_heat_map(self, xr, yr, z):
         z = z[:-1, :-1]
+        x, y = self.xy_grid(xr, yr)
         levels = MaxNLocator(nbins=15).tick_values(z.min(), z.max())
 
         cmap = plt.get_cmap('PiYG')

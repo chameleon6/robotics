@@ -4,10 +4,11 @@ import sys
 import time
 import cPickle as pickle
 import matplotlib.pyplot as plt
+import scipy.io as sio
 from utils import *
 from nn import ControlNN
 from TransitionContainer import TransitionContainer
-
+from NetVisualizer import NetVisualizer
 
 class NNController:
 
@@ -185,6 +186,11 @@ class NNController:
         with open(filename, 'wb') as f:
             pickle.dump(self.transitions.container, f)
 
+    def run_dp_train(self):
+        sa_costs = None
+        with open('dp_sa_cost.p', 'rb') as f:
+            sa_costs = pickle.load(f)
+
     def run_no_matlab(self, container_file):
         #self.transitions.container = self.all_ref_transitions
         with open(container_file, 'rb') as f:
@@ -288,5 +294,6 @@ class NNController:
 if __name__ == '__main__':
     #c = NNController('models/model_8688.out')
     c = NNController()
-    c.run_no_matlab('t1.p')
+    #c.run_no_matlab('t1.p')
     #c.run_matlab()
+    c.run_dp_train()

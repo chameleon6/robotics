@@ -1,5 +1,19 @@
 import time
 import numpy as np
+import contextlib
+import sys
+
+class DummyFile(object):
+    def write(self, x): pass
+
+@contextlib.contextmanager
+def silence():
+    save_stdout = sys.stdout
+    save_stderr = sys.stderr
+    sys.stdout = DummyFile()
+    yield
+    sys.stdout = save_stdout
+    sys.stderr = save_stderr
 
 np.set_printoptions(precision=3)
 np.set_printoptions(suppress=True)
@@ -15,7 +29,7 @@ class Profiler:
     def tic(self, name):
         self.start_times[name] = time.time()
 
-    def toc(self, name, thresh=0.2):
+    def toc(self, name, thresh=0.0):
         ans = time.time() - self.start_times[name]
         if name not in self.runtime_stats:
             self.runtime_stats[name] = []

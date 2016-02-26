@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
+from optimize.snopt7 import SNOPT_solver
 from utils import *
 
 class ControlNN:
@@ -8,15 +9,19 @@ class ControlNN:
         tf_random_seed = 40
         nonlinearity = tf.nn.relu
         self.keep_prob_train_val = 1.0
+        self.floatX = 'float32'
 
         def unif_fanin_mat(shape, name):
             b = np.sqrt(3 * self.keep_prob_train_val / shape[0])
-            initial = tf.random_uniform(shape, minval=-b, maxval=b, seed=tf_random_seed)
+            initial = tf.random_uniform(shape, minval=-b, maxval=b, seed=tf_random_seed, dtype=self.floatX)
             return tf.Variable(initial, name=name)
 
         def bias(shape, name):
-            initial = tf.constant(0.1, shape=shape)
+            initial = tf.constant(0.1, shape=shape, dtype=self.floatX)
             return tf.Variable(initial, name=name)
+
+        self.snopt = SNOPT_solver()
+        self.profiler = Profiler()
 
         conf = read_conf('pendulum.conf')
         self.n_s = 2
@@ -31,14 +36,14 @@ class ControlNN:
         self.n_megabatch = self.n_minibatch * self.n_batches
         self.max_a_min_iters = 5
         self.max_abs_torque = conf['max_torque']
-        self.max_torques = np.array([[self.max_abs_torque]], dtype='float32')
-        self.max_torques_p = np.ones((self.n_megabatch,1)) * np.array([[self.max_abs_torque]], dtype='float32')
-        self.min_torques = np.array([[-self.max_abs_torque]], dtype='float32')
-        self.min_torques_p = np.ones((self.n_megabatch,1)) * np.array([[-self.max_abs_torque]], dtype='float32')
+        self.max_torques = np.array([[self.max_abs_torque]], dtype=self.floatX)
+        self.max_torques_p = np.ones((self.n_megabatch,1)) * np.array([[self.max_abs_torque]], dtype=self.floatX)
+        self.min_torques = np.array([[-self.max_abs_torque]], dtype=self.floatX)
+        self.min_torques_p = np.ones((self.n_megabatch,1)) * np.array([[-self.max_abs_torque]], dtype=self.floatX)
 
         self.sess = tf.Session()
-        self.keep_prob = tf.placeholder('float')
-        self.sa_learn = tf.placeholder('float', shape=[None,self.n_sa])
+        self.keep_prob = tf.placeholder(self.floatX)
+        self.sa_learn = tf.placeholder(self.floatX, shape=[None,self.n_sa])
         self.W_sa_1 = unif_fanin_mat([self.n_sa, self.n_1], 'W_sa_1')
         self.b_1 = bias([self.n_1], 'b_1')
         self.W_1_2 = unif_fanin_mat([self.n_1, self.n_2], 'W_1_2')
@@ -59,7 +64,7 @@ class ControlNN:
 
         self.o1 = nonlinearity(tf.matmul(self.sa_learn, self.W_sa_1) + self.b_1)
         self.q_learn = q_from_input(self.sa_learn)
-        self.y_learn = tf.placeholder('float', shape = [None, 1])
+        self.y_learn = tf.placeholder(self.floatX, shape = [None, 1])
         self.learn_error = tf.reduce_mean(tf.square(self.y_learn - self.q_learn))
 
         self.max_a_time_limit = conf['max_a_time_limit']
@@ -72,26 +77,29 @@ class ControlNN:
         def query_setup(n_sample):
             s_query = tf.placeholder('float', shape=[n_sample, self.n_s])
             a_query = unif_fanin_mat([n_sample, self.n_a], 'a_query')
-            min_cutoff = tf.matmul(np.ones((n_sample, 1), dtype='float32'), self.min_torques)
-            max_cutoff = tf.matmul(np.ones((n_sample, 1), dtype='float32'), self.max_torques)
+            min_cutoff = tf.matmul(np.ones((n_sample, 1), dtype=self.floatX), self.min_torques)
+            max_cutoff = tf.matmul(np.ones((n_sample, 1), dtype=self.floatX), self.max_torques)
             # print "min cutoff:", self.sess.run(min_cutoff)
             # print "max cutoff:", self.sess.run(max_cutoff)
             a_query_clipped = tf.minimum(tf.maximum(min_cutoff, a_query), max_cutoff)
 
             sa_query = tf.concat(1, [s_query, a_query_clipped])
             q_query = q_from_input(sa_query)
+            q_query_mean = tf.reduce_mean(q_query)
 
             query_opt = tf.train.AdamOptimizer(0.1)
-            query_grads_and_vars = query_opt.compute_gradients(tf.reduce_mean(q_query), [a_query])
+            query_grads_and_vars = query_opt.compute_gradients(q_query_mean, [a_query])
             # list of tuples (gradient, variable).
             query_grads_and_vars[0] = (-query_grads_and_vars[0][0], query_grads_and_vars[0][1])
             apply_query_grads = query_opt.apply_gradients(query_grads_and_vars)
-            return s_query, a_query, a_query_clipped, sa_query, q_query, apply_query_grads
+            return s_query, a_query, a_query_clipped, sa_query, q_query, q_query_mean, apply_query_grads
 
-        self.s_query, self.a_query, self.a_query_clipped, \
-                self.sa_query, self.q_query, self.apply_query_grads = query_setup(1)
-        self.s_query_p, self.a_query_p, self.a_query_clipped_p, \
-                self.sa_query_p, self.q_query_p, self.apply_query_grads_p = query_setup(self.n_megabatch)
+        self.s_query, self.a_query, self.a_query_clipped, self.sa_query, self.q_query, \
+                self.q_query_mean, self.apply_query_grads = query_setup(1)
+        self.s_query_p, self.a_query_p, self.a_query_clipped_p, self.sa_query_p, self.q_query_p, \
+                self.q_query_mean_p, self.apply_query_grads_p = query_setup(self.n_megabatch)
+
+        self.sym_grad = tf.gradients(self.q_query_mean_p, self.a_query_p)
 
         self.saver = tf.train.Saver(self.name_var_dict)
 
@@ -148,6 +156,7 @@ class ControlNN:
         #TODO: benchmark different init methods
 
         assert (is_p and len(s.shape) == 2 and s.shape[0] == self.n_megabatch) or (not is_p and len(s.shape) == 1)
+        n_batch = s.shape[0]
 
         ans_a, ans_q = None, None
 
@@ -165,6 +174,77 @@ class ControlNN:
                         np.random.random((self.n_megabatch, self.n_a)) / 2.0
                 #np.zeros([self.n_minibatch, self.n_a])
 
+            #print 'init_a', init_a
+
+            def grad(a):
+                #self.profiler.tic('grad')
+                #print 'sym_grad', sym_grad
+                g = self.sess.run(self.sym_grad, feed_dict={self.s_query_p: s, self.a_query_p: a[:,np.newaxis],
+                    self.keep_prob: 1.0})
+                #self.profiler.toc('grad')
+                #print 'grad', g
+                ret_grad = -g[0].flatten()
+                #print ret_grad, ret_grad.shape
+                return ret_grad
+
+            def obj(a):
+                output = self.sess.run(self.q_query_mean_p, feed_dict={self.s_query_p: s,
+                    self.a_query_p: a[:,np.newaxis], self.keep_prob: 1.0})
+                return -output
+
+            def objFG(status,a,needF,needG,cu,iu,ru):
+                F = np.array([-self.sess.run(self.q_query_mean_p, feed_dict={self.s_query_p: s,
+                    self.a_query_p: a[:,np.newaxis], self.keep_prob: 1.0}), 0])
+                G = grad(a)
+                #print 'F', F, 'G', G, 'a', a
+                return status, F, G
+
+            inf = 1.0e20
+            obj_row = 1
+
+
+            x_names = np.array(['x' + str(i) for i in range(n_batch)])
+            F_names = np.array(['F1', 'F2'])
+            xlow = np.array([-self.max_abs_torque for i in range(n_batch)])
+            xupp = np.array([self.max_abs_torque for i in range(n_batch)])
+
+            Flow = np.array([-inf, -inf])
+            Fupp = np.array([inf, inf])
+
+            A = np.array([[0 for _ in range(n_batch)], [1 for _ in range(n_batch)]])
+            G = np.array([[2 for _ in range(n_batch)], [0 for _ in range(n_batch)]])
+            #print A, G
+
+            self.snopt.setOption('Major print level', 0)
+            self.snopt.snopta(n=n_batch, nF=2, usrfun=objFG, x0=init_a, xlow=xlow, xupp=xupp,
+                Flow=Flow, Fupp=Fupp, ObjRow=obj_row, A=A, G=G, xnames=x_names, Fnames=F_names)
+
+            #print 'results'
+            #print self.snopt.x
+            #print self.snopt.major_itns
+            #print self.snopt.objective
+
+            res_x = self.snopt.x
+
+            #def max_constraint(i,j):
+            #    return {'type':'ineq', 'fun': lambda a: self.max_torques_p[i][j] - a[i][j]}
+            #def min_constraint(i,j):
+            #    return {'type':'ineq', 'fun': lambda a: a[i][j] - self.min_torques_p[i][j]}
+            #constraints = tuple([max_constraint(i,j) for i in range(n_batch) for j in range(self.n_1)] + \
+            #        [min_constraint(i,j) for i in range(n_batch) for j in range(self.n_1)])
+
+            bounds = tuple([(-self.max_abs_torque, self.max_abs_torque) for i in range(n_batch)])
+            #res = scipy_minimize(obj, init_a, method='L-BFGS-B', jac=grad, bounds=bounds,
+            #        options = {'disp':True, 'factr':1e12})
+            #print res
+            q_final = self.sess.run(self.q_query_p, feed_dict={self.s_query_p: s,
+                self.a_query_p: res_x, self.keep_prob: 1.0})
+            #print 'q_final', q_final
+
+            return res_x, q_final
+
+
+            '''
             self.sess.run(self.a_query_p.assign(init_a))
             count = 0
             old_a = None
@@ -188,6 +268,7 @@ class ControlNN:
                 if done:
                     return a, self.q_query_from_s_p(s)
                 old_a = a
+                '''
 
         def inner(init_a, time_limit):
             start_time = time.time()

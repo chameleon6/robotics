@@ -18,7 +18,7 @@ class NNController:
         self.matlab_state_file = os.getcwd() + '/matlab_state_file.out'
         self.python_action_file = os.getcwd() + '/python_action_file.out'
 
-        conf = read_conf('exploit_pendulum.conf')
+        conf = read_conf('pendulum.conf')
 
         self.max_torque = conf['max_torque']
         self.bang_action = conf['bang_action']
@@ -154,20 +154,20 @@ class NNController:
     def parse_transitions(self, ts):
         rs = np.array([t[2] for t in ts])[:, np.newaxis]
         new_states = np.array([t[3] for t in ts])
-        #best_q = self.old_net.get_best_a_p(new_states, is_p=True, num_tries=2)[1]
-        aq = self.old_net.manual_max_a_p(new_states)
-        best_q = aq[:,1][:,np.newaxis]
+        best_q = self.old_net.get_best_a_p(new_states, is_p=True, num_tries=1)[1]
+        #aq = self.old_net.manual_max_a_p(new_states)
+        #best_q = aq[:,1][:,np.newaxis]
         ys = rs + self.gamma * best_q
-        print 'new_states'
-        print new_states[:30]
-        print 'aq'
-        print aq[:30]
-        print 'best_q'
-        print best_q[:30]
-        print 'rs'
-        print rs[:30]
-        print 'ys'
-        print ys[:30]
+        #print 'new_states'
+        #print new_states[:30]
+        #print 'aq'
+        #print aq[:30]
+        #print 'best_q'
+        #print best_q[:30]
+        #print 'rs'
+        #print rs[:30]
+        #print 'ys'
+        #print ys[:30]
         sa = np.array([np.append(t[0], t[1]) for t in ts])
         return sa, ys
 
@@ -286,6 +286,7 @@ class NNController:
             print
 
 if __name__ == '__main__':
-    c = NNController('models/model_8688.out')
-    #c.run_no_matlab('t1.p')
-    c.run_matlab()
+    #c = NNController('models/model_8688.out')
+    c = NNController()
+    c.run_no_matlab('t1.p')
+    #c.run_matlab()

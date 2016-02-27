@@ -38,6 +38,7 @@ class ControlNN:
         self.n_megabatch = self.n_minibatch * self.n_batches
         self.max_a_min_iters = 5
         self.max_abs_torque = conf['max_torque']
+        #self.a_tolerance = conf['a_tolerance']
         self.max_torques = np.array([[self.max_abs_torque]], dtype=self.floatX)
         self.max_torques_p = np.ones((self.n_megabatch,1)) * np.array([[self.max_abs_torque]], dtype=self.floatX)
         self.min_torques = np.array([[-self.max_abs_torque]], dtype=self.floatX)
@@ -176,6 +177,10 @@ class ControlNN:
         A = np.array([[0 for _ in range(n_batch)], [1 for _ in range(n_batch)]])
         G = np.array([[2 for _ in range(n_batch)], [0 for _ in range(n_batch)]])
 
+        vs = {}
+        vs['count'] = 0
+        vs['old_a'] = None
+
         ans_a, ans_q = None, None
 
         def check_timeout(start_time, time_limit):
@@ -185,17 +190,22 @@ class ControlNN:
                 return True
             return False
 
+        def update_tolerance_conditions(a):
+            vs['count'] += 1
+            #if vs['old_a'] != None and np.max(np.abs(a - vs['old_a'])) < self.a_tolerance:
+            #    print 'vs', vs
+            #    return -1
+            #vs['old_a'] = a
+            if vs['count'] > 100:
+                return -1
+            return 0
+
         def inner_p(init_a, time_limit):
             start_time = time.time()
             if init_a == None:
                 init_a = self.min_torques_p + (self.max_torques_p - self.min_torques_p) * \
                         np.random.random((self.n_megabatch, self.n_a)) / 2.0
 
-
-            #def obj(a):
-            #    output = self.sess.run(self.q_query_mean_p, feed_dict={self.s_query_p: s,
-            #        self.a_query_p: a[:,np.newaxis], self.keep_prob: 1.0})
-            #    return -output
             def grad(a):
                 g = self.sess.run(self.sym_grad_p, feed_dict={self.s_query_p: s, self.a_query_p: a[:,np.newaxis],
                     self.keep_prob: 1.0})
@@ -206,15 +216,11 @@ class ControlNN:
                 F = np.array([-self.sess.run(self.q_query_mean_p, feed_dict={self.s_query_p: s,
                     self.a_query_p: a[:,np.newaxis], self.keep_prob: 1.0}), 0])
                 G = grad(a)
+                status = update_tolerance_conditions(a)
                 return status, F, G
 
             self.snopt.snopta(n=n_batch, nF=2, usrfun=objFG, x0=init_a, xlow=xlow, xupp=xupp,
                 Flow=Flow, Fupp=Fupp, ObjRow=obj_row, A=A, G=G, xnames=x_names, Fnames=F_names)
-
-            #print 'results'
-            #print self.snopt.x
-            #print self.snopt.major_itns
-            #print self.snopt.objective
 
             res_x = self.snopt.x
 
@@ -225,7 +231,6 @@ class ControlNN:
 
         def inner(init_a, time_limit):
             start_time = time.time()
-            count = [0]
             if init_a == None:
                 #init_a = np.zeros([1, self.n_a])
                 init_a = self.min_torques + (self.max_torques - self.min_torques) * \
@@ -241,9 +246,7 @@ class ControlNN:
                 F = np.array([-self.sess.run(self.q_query_mean, feed_dict={self.s_query: s[np.newaxis,:],
                     self.a_query: a[:,np.newaxis], self.keep_prob: 1.0}), 0])
                 G = grad(a)
-                count[0] += 1
-                if count[0] > 10:
-                    status = -1
+                status = update_tolerance_conditions(a)
                 return status, F, G
 
             self.snopt.snopta(n=n_batch, nF=2, usrfun=objFG, x0=init_a, xlow=xlow, xupp=xupp,

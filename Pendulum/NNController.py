@@ -335,9 +335,9 @@ class NNController:
 
 if __name__ == '__main__':
     #c = NNController(load_path=None, conf='pendulum.conf')
-    #c.run_dp_train()
-
-    c = NNController(load_path='models/model_48657.out', conf='exploit_pendulum.conf')
-    c.run_matlab()
-
+    ##c.run_dp_train()
     #c.run_no_matlab('t1.p')
+
+    #c = NNController(load_path='models/model_48657.out', conf='exploit_pendulum.conf')
+    c = NNController(load_path='models/model_39574.out', conf='exploit_pendulum.conf')
+    c.run_matlab()

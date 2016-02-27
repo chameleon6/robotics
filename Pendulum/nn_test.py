@@ -11,9 +11,9 @@ conf = read_conf('pendulum.conf')
 
 start_time = time.time()
 #save_path = 'models/model_20247.out'
-save_path = 'models/model_8688.out'
-#net = ControlNN(save_path)
-#vis = NetVisualizer(net)
+save_path = 'models/model_35202.out'
+net = ControlNN(save_path)
+vis = NetVisualizer(net)
 print "compile time", time.time() - start_time
 
 s = np.array([0.5, 0.5])
@@ -51,9 +51,9 @@ def graph_max_a_test():
     print net.get_best_a(s)
     net.graph_output(s, (-5,5))
 
-def max_verification_test():
+def max_verification_test(test_p):
     u_max = conf['max_torque']
-    s_max = 10
+    s_max = 2
     s = s_max * np.random.random((n_minibatch,2))
     #s1 = s_max * np.random.random(2)
 
@@ -65,7 +65,20 @@ def max_verification_test():
 
     profiler.tic('net max')
     print "net max"
-    res_a, res_q = net.get_best_a_p(s, is_p=True, num_tries=1)
+
+    if test_p:
+        res_a, res_q = net.get_best_a_p(s, is_p=True, num_tries=1)
+    else:
+        res_a = []
+        res_q = []
+        for i in s:
+            ra, rq = net.get_best_a_p(i, is_p=False, num_tries=1)
+            res_a.append(ra.flatten())
+            res_q.append(rq.flatten())
+
+        res_a = np.array(res_a)
+        res_q = np.array(res_q)
+
     net_out = np.concatenate((res_a, res_q), 1)
     #print net_out
     profiler.toc('net max')
@@ -77,30 +90,26 @@ def max_verification_test():
     summary = np.concatenate((s, net_out, manual_out, diff), 1)
     print 'summary'
     print summary
-    #return summary
+    return summary
 
-#summary = max_verification_test()
-#vis.q_heat_map()
+def dp_plot_test():
+    C = None
+    with open('dp_C.out', 'r') as f:
+        C = np.array(map(float, f.read().strip().split('\n')))
 
-C = None
-with open('dp_C.out', 'r') as f:
-    C = np.array(map(float, f.read().strip().split('\n')))
+    J = None
+    with open('dp_J.out', 'r') as f:
+        J = np.array(map(float, f.read().strip().split('\n')))
 
-J = None
-with open('dp_J.out', 'r') as f:
-    J = np.array(map(float, f.read().strip().split('\n')))
+    T = sio.loadmat('dp_T.mat')['t'][0]
+    B = np.array([T[i] * J for i in range(9)])
+    C = C.reshape((9,-1))
+    J2 = np.min(C+B, 0).reshape(51,51)
 
-T = sio.loadmat('dp_T.mat')['t'][0]
-B = np.array([T[i] * J for i in range(9)])
-C = C.reshape((9,-1))
-J2 = np.min(C+B, 0).reshape(51,51)
+    vis = NetVisualizer()
+    xr = (0, 2*np.pi, 51)
+    xdr = (-10., 10., 51)
+    vis.plot_heat_map(xr, xdr, J2)
 
-vis = NetVisualizer()
-xr = (0, 2*np.pi, 51)
-xdr = (-10., 10., 51)
-vis.plot_heat_map(xr, xdr, J2)
-
-#print T
-
-#C = np.array(C).reshape((51, 51, 9))
-#J = np.array(J).reshape(51,51)
+#summary = max_verification_test(False)
+vis.q_heat_map()

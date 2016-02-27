@@ -13,14 +13,14 @@ from NetVisualizer import NetVisualizer
 
 class NNController:
 
-    def __init__(self, load_path=None):
+    def __init__(self, conf, load_path=None):
         self.profiler = Profiler()
         self.profiler.tic('total controller run time')
 
         self.matlab_state_file = os.getcwd() + '/matlab_state_file.out'
         self.python_action_file = os.getcwd() + '/python_action_file.out'
 
-        conf = read_conf('exploit_pendulum.conf')
+        conf = read_conf(conf)
 
         self.max_torque = conf['max_torque']
         self.bang_action = conf['bang_action']
@@ -294,11 +294,17 @@ class NNController:
                 self.last_action_time = self.train_t
                 if np.random.random() > self.epsilon:
                     self.profiler.tic('action')
-                    #action = self.current_net.get_best_a_p(state, is_p=False, num_tries=2)[0][0][0]
+
+                    action = self.current_net.get_best_a_p(state, is_p=False,
+                            init_a = np.array([[self.last_action]]), num_tries=1)[0][0][0]
+
+                    '''
                     aq = self.old_net.manual_max_a(state)
-                    print aq
+                    #print aq
                     #best_q = aq[:,1][:,np.newaxis]
                     action = aq[0]
+                    '''
+
                     self.profiler.toc('action')
                 else:
                     action = self.random_action()
@@ -328,8 +334,10 @@ class NNController:
             print
 
 if __name__ == '__main__':
-    #c = NNController('models/model_35202.out')
-    c = NNController()
+    #c = NNController(load_path=None, conf='pendulum.conf')
+    #c.run_dp_train()
+
+    c = NNController(load_path='models/model_48657.out', conf='exploit_pendulum.conf')
+    c.run_matlab()
+
     #c.run_no_matlab('t1.p')
-    #c.run_matlab()
-    c.run_dp_train()

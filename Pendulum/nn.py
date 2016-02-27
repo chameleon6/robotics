@@ -85,7 +85,8 @@ class ControlNN:
             # print "max cutoff:", self.sess.run(max_cutoff)
             a_query_clipped = tf.minimum(tf.maximum(min_cutoff, a_query), max_cutoff)
 
-            sa_query = tf.concat(1, [s_query, a_query_clipped])
+            #sa_query = tf.concat(1, [s_query, a_query_clipped])
+            sa_query = tf.concat(1, [s_query, a_query])
             q_query = q_from_input(sa_query)
             q_query_mean = tf.reduce_mean(q_query)
 
@@ -101,7 +102,8 @@ class ControlNN:
         self.s_query_p, self.a_query_p, self.a_query_clipped_p, self.sa_query_p, self.q_query_p, \
                 self.q_query_mean_p, self.apply_query_grads_p = query_setup(self.n_megabatch)
 
-        self.sym_grad = tf.gradients(self.q_query_mean_p, self.a_query_p)
+        self.sym_grad_p = tf.gradients(self.q_query_mean_p, self.a_query_p)
+        self.sym_grad = tf.gradients(self.q_query_mean, self.a_query)
 
         self.saver = tf.train.Saver(self.name_var_dict)
 
@@ -158,7 +160,21 @@ class ControlNN:
         #TODO: benchmark different init methods
 
         assert (is_p and len(s.shape) == 2 and s.shape[0] == self.n_megabatch) or (not is_p and len(s.shape) == 1)
-        n_batch = s.shape[0]
+        n_batch = s.shape[0] if is_p else 1
+
+        inf = 1.0e20
+        obj_row = 1
+
+        x_names = np.array(['x' + str(i) for i in range(n_batch)])
+        F_names = np.array(['F1', 'F2'])
+        xlow = np.array([-self.max_abs_torque for i in range(n_batch)])
+        xupp = np.array([self.max_abs_torque for i in range(n_batch)])
+
+        Flow = np.array([-inf, -inf])
+        Fupp = np.array([inf, inf])
+
+        A = np.array([[0 for _ in range(n_batch)], [1 for _ in range(n_batch)]])
+        G = np.array([[2 for _ in range(n_batch)], [0 for _ in range(n_batch)]])
 
         ans_a, ans_q = None, None
 
@@ -174,48 +190,23 @@ class ControlNN:
             if init_a == None:
                 init_a = self.min_torques_p + (self.max_torques_p - self.min_torques_p) * \
                         np.random.random((self.n_megabatch, self.n_a)) / 2.0
-                #np.zeros([self.n_minibatch, self.n_a])
 
-            #print 'init_a', init_a
 
+            #def obj(a):
+            #    output = self.sess.run(self.q_query_mean_p, feed_dict={self.s_query_p: s,
+            #        self.a_query_p: a[:,np.newaxis], self.keep_prob: 1.0})
+            #    return -output
             def grad(a):
-                #self.profiler.tic('grad')
-                #print 'sym_grad', sym_grad
-                g = self.sess.run(self.sym_grad, feed_dict={self.s_query_p: s, self.a_query_p: a[:,np.newaxis],
+                g = self.sess.run(self.sym_grad_p, feed_dict={self.s_query_p: s, self.a_query_p: a[:,np.newaxis],
                     self.keep_prob: 1.0})
-                #self.profiler.toc('grad')
-                #print 'grad', g
                 ret_grad = -g[0].flatten()
-                #print ret_grad, ret_grad.shape
                 return ret_grad
-
-            def obj(a):
-                output = self.sess.run(self.q_query_mean_p, feed_dict={self.s_query_p: s,
-                    self.a_query_p: a[:,np.newaxis], self.keep_prob: 1.0})
-                return -output
 
             def objFG(status,a,needF,needG,cu,iu,ru):
                 F = np.array([-self.sess.run(self.q_query_mean_p, feed_dict={self.s_query_p: s,
                     self.a_query_p: a[:,np.newaxis], self.keep_prob: 1.0}), 0])
                 G = grad(a)
-                #print 'F', F, 'G', G, 'a', a
                 return status, F, G
-
-            inf = 1.0e20
-            obj_row = 1
-
-
-            x_names = np.array(['x' + str(i) for i in range(n_batch)])
-            F_names = np.array(['F1', 'F2'])
-            xlow = np.array([-self.max_abs_torque for i in range(n_batch)])
-            xupp = np.array([self.max_abs_torque for i in range(n_batch)])
-
-            Flow = np.array([-inf, -inf])
-            Fupp = np.array([inf, inf])
-
-            A = np.array([[0 for _ in range(n_batch)], [1 for _ in range(n_batch)]])
-            G = np.array([[2 for _ in range(n_batch)], [0 for _ in range(n_batch)]])
-            #print A, G
 
             self.snopt.snopta(n=n_batch, nF=2, usrfun=objFG, x0=init_a, xlow=xlow, xupp=xupp,
                 Flow=Flow, Fupp=Fupp, ObjRow=obj_row, A=A, G=G, xnames=x_names, Fnames=F_names)
@@ -227,74 +218,44 @@ class ControlNN:
 
             res_x = self.snopt.x
 
-            #def max_constraint(i,j):
-            #    return {'type':'ineq', 'fun': lambda a: self.max_torques_p[i][j] - a[i][j]}
-            #def min_constraint(i,j):
-            #    return {'type':'ineq', 'fun': lambda a: a[i][j] - self.min_torques_p[i][j]}
-            #constraints = tuple([max_constraint(i,j) for i in range(n_batch) for j in range(self.n_1)] + \
-            #        [min_constraint(i,j) for i in range(n_batch) for j in range(self.n_1)])
-
-            bounds = tuple([(-self.max_abs_torque, self.max_abs_torque) for i in range(n_batch)])
-            #res = scipy_minimize(obj, init_a, method='L-BFGS-B', jac=grad, bounds=bounds,
-            #        options = {'disp':True, 'factr':1e12})
-            #print res
             q_final = self.sess.run(self.q_query_p, feed_dict={self.s_query_p: s,
                 self.a_query_p: res_x, self.keep_prob: 1.0})
-            #print 'q_final', q_final
 
             return res_x, q_final
 
-
-            '''
-            self.sess.run(self.a_query_p.assign(init_a))
-            count = 0
-            old_a = None
-            while True:
-                self.sess.run(self.apply_query_grads_p, feed_dict={self.s_query_p: s, self.keep_prob: 1.0})
-                count += 1
-                a = self.sess.run(self.a_query_clipped_p)
-                done = False
-                if count > self.max_a_min_iters:
-                    #if count % 1000 == 0:
-                    #    print count
-                    #    print 'old_a'
-                    #    print old_a
-                    #    print 'delta'
-                    #    print a - old_a
-                    if np.linalg.norm(a - old_a) < tolerance * np.sqrt(self.n_megabatch) or \
-                            check_timeout(start_time, time_limit):
-                        print 'max_a_p converge_count', count
-                        done = True
-
-                if done:
-                    return a, self.q_query_from_s_p(s)
-                old_a = a
-                '''
-
         def inner(init_a, time_limit):
             start_time = time.time()
+            count = [0]
             if init_a == None:
                 #init_a = np.zeros([1, self.n_a])
                 init_a = self.min_torques + (self.max_torques - self.min_torques) * \
                         np.random.random((1, self.n_a))
 
-            self.sess.run(self.a_query.assign(init_a))
+            def grad(a):
+                g = self.sess.run(self.sym_grad, feed_dict={self.s_query: s[np.newaxis,:],
+                    self.a_query: a[:,np.newaxis], self.keep_prob: 1.0})
+                ret_grad = -g[0].flatten()
+                return ret_grad
 
-            count = 0
-            #old_q = self.q_query_from_s(s)
-            old_a = None
-            while True:
-                self.sess.run(self.apply_query_grads, feed_dict={self.s_query: s[np.newaxis,:], self.keep_prob: 1.0})
-                new_q = self.q_query_from_s(s)
-                count += 1
-                a = self.sess.run(self.a_query_clipped)
-                #print count, old_a, a
-                if count > self.max_a_min_iters:
-                    if np.linalg.norm(a - old_a) < tolerance or check_timeout(start_time, time_limit):
-                        print "max_a converge count:", count
-                        return a, new_q
-                old_a = a
-                #old_q = new_q
+            def objFG(status,a,needF,needG,cu,iu,ru):
+                F = np.array([-self.sess.run(self.q_query_mean, feed_dict={self.s_query: s[np.newaxis,:],
+                    self.a_query: a[:,np.newaxis], self.keep_prob: 1.0}), 0])
+                G = grad(a)
+                count[0] += 1
+                if count[0] > 10:
+                    status = -1
+                return status, F, G
+
+            self.snopt.snopta(n=n_batch, nF=2, usrfun=objFG, x0=init_a, xlow=xlow, xupp=xupp,
+                    Flow=Flow, Fupp=Fupp, ObjRow=obj_row, A=A, G=G)#, xnames=x_names, Fnames=F_names)
+
+            res_x = self.snopt.x
+            print init_a, res_x
+
+            q_final = self.sess.run(self.q_query, feed_dict={self.s_query: s[np.newaxis,:],
+                self.a_query: res_x, self.keep_prob: 1.0})
+
+            return res_x, q_final
 
         inner_function = inner_p if is_p else inner
         iter_time_limit = self.max_a_time_limit / num_tries

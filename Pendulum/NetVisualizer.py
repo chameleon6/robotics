@@ -50,8 +50,8 @@ class NetVisualizer:
     def q_heat_map(self):
 
         #y, x = np.mgrid[slice(-3, 3., 2*3./20), slice(0, 2*np.pi, 2*np.pi/20)]
-        th_r = (2.0, 4.2, 40)
-        th_dot_r = (-5.5, 5.5, 40)
+        th_r = (0, 2*np.pi, 40)
+        th_dot_r = (-10., 10., 40)
         x, y = self.xy_grid(th_r, th_dot_r)
 
         #z = np.sin(x)**10 + np.cos(10 + y*x) * np.cos(x)
@@ -72,11 +72,11 @@ class NetVisualizer:
 
         self.profiler.toc('heat map max calculations')
         print z
-        for _ in range(6):
-            i = np.array([np.random.uniform(th_r[0], th_r[1]),
-                np.random.uniform(th_dot_r[0], th_dot_r[1])])
-            q = self.net.get_best_a_p(i, is_p=False, num_tries=3)[1][0][0]
-            print i, q
+        #for _ in range(6):
+        #    i = np.array([np.random.uniform(th_r[0], th_r[1]),
+        #        np.random.uniform(th_dot_r[0], th_dot_r[1])])
+        #    q = self.net.get_best_a_p(i, is_p=False, num_tries=3)[1][0][0]
+        #    print i, q
         self.plot_heat_map(th_r, th_dot_r, z)
 
 

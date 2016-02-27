@@ -59,7 +59,7 @@ classdef NNController < DrakeSystem
       start_time = cputime;
       while true
         while exist(obj.python_action_file, 'file') ~= 2
-          if cputime - start_time > 60
+          if cputime - start_time > 10
             cputime - start_time
             error('timeout')
           end

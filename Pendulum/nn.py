@@ -21,6 +21,8 @@ class ControlNN:
             return tf.Variable(initial, name=name)
 
         self.snopt = SNOPT_solver()
+        self.snopt.setOption('Major print level', 0)
+
         self.profiler = Profiler()
 
         conf = read_conf('pendulum.conf')
@@ -136,8 +138,10 @@ class ControlNN:
         xs = np.linspace(xr[0], xr[1], n)[:,np.newaxis]
         return xs, np.concatenate((np.ones((n,1)) * s[np.newaxis,:], xs), 1)
 
-    def manual_max_a(self, s, xr):
+    def manual_max_a(self, s, xr=None):
         assert self.n_a == 1
+        if xr == None:
+            xr = self.max_abs_torque * np.array([-1.,1])
         xs, inputs = self.s_const_grid(s, xr)
         outputs = self.q_from_sa(inputs).flatten()
         best_input = np.argmax(outputs)
@@ -145,8 +149,6 @@ class ControlNN:
 
     def manual_max_a_p(self, s, xr=None):
         assert self.n_a == 1
-        if xr == None:
-            xr = self.max_abs_torque * np.array([-1.,1])
         ans = []
         for i in s:
             ans.append(self.manual_max_a(i, xr))
@@ -215,7 +217,6 @@ class ControlNN:
             G = np.array([[2 for _ in range(n_batch)], [0 for _ in range(n_batch)]])
             #print A, G
 
-            self.snopt.setOption('Major print level', 0)
             self.snopt.snopta(n=n_batch, nF=2, usrfun=objFG, x0=init_a, xlow=xlow, xupp=xupp,
                 Flow=Flow, Fupp=Fupp, ObjRow=obj_row, A=A, G=G, xnames=x_names, Fnames=F_names)
 
@@ -311,13 +312,14 @@ class ControlNN:
         return ans_a, ans_q
 
     def mse_q(self, sa_vals, y_vals):
+        print 'learn_rate', self.sess.run(self.learn_rate)
         return self.sess.run(self.learn_error,
                 feed_dict={self.sa_learn: sa_vals, self.y_learn: y_vals, self.keep_prob: 1.0})
 
     def train(self, sa_vals, y_vals):
         self.sess.run(self.learn_opt, feed_dict={self.y_learn: y_vals,
             self.sa_learn: sa_vals, self.keep_prob: self.keep_prob_train_val})
-        print 'learn_rate', self.sess.run(self.learn_rate)
+        #print 'learn_rate', self.sess.run(self.learn_rate)
 
     def save_model(self, save_path):
         self.saver.save(self.sess, save_path)

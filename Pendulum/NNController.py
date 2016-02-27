@@ -2,6 +2,7 @@ import numpy as np
 import os
 import sys
 import time
+import random
 import cPickle as pickle
 import matplotlib.pyplot as plt
 import scipy.io as sio
@@ -19,7 +20,7 @@ class NNController:
         self.matlab_state_file = os.getcwd() + '/matlab_state_file.out'
         self.python_action_file = os.getcwd() + '/python_action_file.out'
 
-        conf = read_conf('pendulum.conf')
+        conf = read_conf('exploit_pendulum.conf')
 
         self.max_torque = conf['max_torque']
         self.bang_action = conf['bang_action']
@@ -189,7 +190,38 @@ class NNController:
     def run_dp_train(self):
         sa_costs = None
         with open('dp_sa_cost.p', 'rb') as f:
-            sa_costs = pickle.load(f)
+            sa_costs = pickle.load(f).flatten()
+
+        sa_samples = []
+        a_grid = np.linspace(-2, 2, 9)
+        s1_grid = np.linspace(0, 2*np.pi, 51)
+        s2_grid = np.linspace(-10, 10, 51)
+
+        for i, c in enumerate(sa_costs):
+            a = i / (51 * 51)
+            ss = i % (51 * 51)
+            s1, s2 = ss / 51, ss % 51
+            a = a_grid[a]
+            s1 = s1_grid[s1]
+            s2 = s2_grid[s2]
+            sa_samples.append([s1, s2, a, c])
+
+        mses = []
+        for i in range(10000):
+            t = np.array(random.sample(sa_samples, 100))
+
+            if i%100 == 0:
+                print 'iter', i
+                mse = self.current_net.mse_q(t[:,0:3], -t[:,3][:,np.newaxis])
+                print 'mse', mse
+                mses.append(mse)
+            else:
+                self.current_net.train(t[:,0:3], -t[:,3][:,np.newaxis])
+
+        #plt.plot(mses); plt.show()
+        vis = NetVisualizer(self.current_net)
+        vis.q_heat_map()
+
 
     def run_no_matlab(self, container_file):
         #self.transitions.container = self.all_ref_transitions
@@ -262,7 +294,11 @@ class NNController:
                 self.last_action_time = self.train_t
                 if np.random.random() > self.epsilon:
                     self.profiler.tic('action')
-                    action = self.current_net.get_best_a_p(state, is_p=False, num_tries=2)[0][0][0]
+                    #action = self.current_net.get_best_a_p(state, is_p=False, num_tries=2)[0][0][0]
+                    aq = self.old_net.manual_max_a(state)
+                    print aq
+                    #best_q = aq[:,1][:,np.newaxis]
+                    action = aq[0]
                     self.profiler.toc('action')
                 else:
                     action = self.random_action()
@@ -292,7 +328,7 @@ class NNController:
             print
 
 if __name__ == '__main__':
-    #c = NNController('models/model_8688.out')
+    #c = NNController('models/model_35202.out')
     c = NNController()
     #c.run_no_matlab('t1.p')
     #c.run_matlab()

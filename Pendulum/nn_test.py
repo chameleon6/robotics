@@ -96,8 +96,9 @@ C = C.reshape((9,-1))
 J2 = np.min(C+B, 0).reshape(51,51)
 
 vis = NetVisualizer()
-xr = (0.,51.,51)
-vis.plot_heat_map(xr, xr, J2)
+xr = (0, 2*np.pi, 51)
+xdr = (-10., 10., 51)
+vis.plot_heat_map(xr, xdr, J2)
 
 #print T
 

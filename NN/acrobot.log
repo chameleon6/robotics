@@ -1,0 +1,67 @@
+INFO:root:test
+INFO:root:succeeded, reward=1.0, sim_t=0.0, state=[ 0.03  -0.02  -0.015 -0.01 ]
+INFO:root:test
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.148 -0.017 -0.054 -0.084]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.17   0.018  0.003 -0.052]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.131  0.002 -0.009  0.017]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.176 -0.06   0.403 -0.564]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.114  0.003  0.811 -1.647]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.123  0.088 -0.241  0.53 ]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.177 -0.061  0.361 -0.617]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.193 -0.019  0.231 -0.525]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.202  0.042  0.047 -0.099]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.17   0.006 -0.628  1.25 ]
+INFO:root:succeeded, reward=1.0, sim_t=2.04, state=[  2.932   5.851 -12.254  29.871]
+INFO:root:log for acrobot
+INFO:root:didn't succeed :(
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.135 -0.021 -0.035 -0.103]
+INFO:root:didn't succeed :(
+INFO:root:didn't succeed :(
+INFO:root:didn't succeed :(
+INFO:root:didn't succeed :(
+INFO:root:didn't succeed :(
+INFO:root:didn't succeed :(
+INFO:root:didn't succeed :(
+INFO:root:log for acrobot
+INFO:root:didn't succeed :(
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.173  0.047 -0.027  0.017]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.149 -0.017 -0.041 -0.016]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.141  0.082  0.018  0.011]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.057  0.071 -0.923  1.78 ]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.201  0.035 -0.003  0.15 ]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.135  0.122 -1.432  2.74 ]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.067 -0.133  1.023 -2.11 ]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.161  0.002 -0.184  0.202]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.132 -0.015 -0.8    1.537]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.244  0.028  0.957 -1.919]
+INFO:root:succeeded, reward=1.0, sim_t=0.96, state=[  3.929   5.244  -4.062  10.778]
+INFO:root:succeeded, reward=1.0, sim_t=1.93, state=[  2.406 -17.698   8.14  -21.378]
+INFO:root:succeeded, reward=1.0, sim_t=4.47, state=[  3.717  -1.073  -3.773  14.2  ]
+INFO:root:log for acrobot
+INFO:root:didn't succeed :(
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.185  0.081 -0.07   0.122]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.075  0.1   -0.088  0.159]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.234 -0.11   0.042 -0.161]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.169 -0.015 -0.047  0.087]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.159 -0.04  -0.022 -0.06 ]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.093 -0.056 -0.1    0.095]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.114  0.012  0.13  -0.352]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.151  0.127 -0.152  0.159]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.049 -0.024 -0.2    0.221]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.154 -0.007  0.056 -0.071]
+INFO:root:didn't succeed :(
+INFO:root:didn't succeed :(
+INFO:root:log for acrobot
+INFO:root:didn't succeed :(
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.075 -0.009  0.293 -0.495]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.186  0.066  0.333 -0.512]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.145  0.055  0.268 -0.419]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.083 -0.004 -0.    -0.155]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.202  0.059  0.143 -0.094]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.084  0.043 -0.162  0.2  ]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.154  0.038 -0.079  0.312]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.2   -0.014  0.308 -0.606]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.247 -0.039  0.343 -0.675]
+INFO:root:succeeded, reward=1.0, sim_t=0.05, state=[ 3.134  0.049 -0.351  0.641]
+INFO:root:didn't succeed :(
+INFO:root:didn't succeed :(

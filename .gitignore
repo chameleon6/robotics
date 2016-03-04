@@ -2,6 +2,8 @@
 /*
 !/KneedCompassGait
 !/Pendulum
+!/NN
+!/Acrobot
 !/.gitignore
 *pyc
 *autosave

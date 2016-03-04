@@ -23,6 +23,7 @@ class NNController:
         conf = read_conf(conf)
 
         self.max_torque = conf['max_torque']
+        self.model_name = conf['name']
         self.bang_action = conf['bang_action']
         #self.old_net_update_time = conf['old_net_update_time']
         self.old_net_update_delay = conf['old_net_update_delay']
@@ -37,6 +38,7 @@ class NNController:
         self.gamma = conf['gamma']
         self.sim_dt = conf['sim_dt']
         self.start_epsilon = conf['start_epsilon']
+        self.mse_freq = conf['mse_freq']
 
         assert self.start_epsilon >= self.final_epsilon
 
@@ -47,9 +49,10 @@ class NNController:
         self.last_train_time = 0.0
         self.last_action_time = 0.0
         self.time_step = 1
-        self.times_trained = 0
+        self.times_trained = 1
         self.last_state = None
         self.last_action = None
+        self.succeeded = False
         self.train_t = -self.no_op_time
         self.sim_start_time = self.train_t - 10
         self.sim_num = 0
@@ -66,24 +69,29 @@ class NNController:
         self.mse_hist2 = []
         self.rmse_rel_hist = []
         self.rmse_rel_hist2 = []
+        self.learn_rate_hist = []
 
-        self.transitions = TransitionContainer()
-        with open('reference_transitions.p', 'rb') as f:
+        self.transitions = TransitionContainer(conf['max_history_len'])
+
+        with open(conf['ref_transitions_file'], 'rb') as f:
             self.all_ref_transitions = pickle.load(f)
         np.random.shuffle(self.all_ref_transitions)
         self.ref_transitions = self.all_ref_transitions[:self.n_megabatch]
         #print self.ref_transitions
 
-
         #self.load_path = 'models/model_31275.out'
         #self.load_path = 'models/model_77422.out'
         self.load_path = load_path
-        self.current_net = ControlNN(self.load_path)
-        self.old_net = ControlNN(self.load_path)
+        self.current_net = ControlNN(conf=conf, load_path=self.load_path)
+        self.old_net = ControlNN(conf=conf, load_path=self.load_path)
 
         self.transfer_path = '/tmp/model_transfer'
-        self.save_path = 'models/model_%s.out' % (int(time.time() * 10000) % 100000)
-        print 'saving to', self.save_path
+        rand_int = int(time.time() * 10000) % 100000
+        self.save_path = 'models/model_%s.out' % rand_int
+        self.log_path = self.model_name + '.log'
+        logging.basicConfig(filename=self.log_path,level=logging.INFO)
+        logging.info('log for %s', self.model_name)
+        print 'saving to', self.save_path, 'logging to', self.log_path
 
     def maybe_update_old_net(self):
         if self.times_trained - self.last_old_net_update_count > self.old_net_update_delay:
@@ -174,7 +182,9 @@ class NNController:
         return sa, ys
 
     def random_action(self):
-        return np.random.uniform(-self.max_torque,self.max_torque)
+        a = np.random.uniform(-self.max_torque,self.max_torque)
+        print 'random_action', a
+        return a
 
     def plot_sim(self, ind):
         aa = np.array(self.a_hists[ind])
@@ -188,6 +198,7 @@ class NNController:
             pickle.dump(self.transitions.container, f)
 
     def run_dp_train(self):
+
         sa_costs = None
         with open('dp_sa_cost.p', 'rb') as f:
             sa_costs = pickle.load(f).flatten()
@@ -200,21 +211,27 @@ class NNController:
         for i, c in enumerate(sa_costs):
             a = i / (51 * 51)
             ss = i % (51 * 51)
-            s1, s2 = ss / 51, ss % 51
+            s2, s1 = ss / 51, ss % 51
             a = a_grid[a]
             s1 = s1_grid[s1]
             s2 = s2_grid[s2]
             sa_samples.append([s1, s2, a, c])
 
-        mses = []
-        for i in range(10000):
-            t = np.array(random.sample(sa_samples, 100))
+        sa_samples = np.array(sa_samples)
+        n = len(sa_samples)
+        for i in range(100000):
+            sample_size = n if i%100==0 else 50
+            inds = np.random.choice(range(n), sample_size, False)
+            #t = np.array(random.sample(sa_samples, sample_size))
+            t = sa_samples[inds]
 
             if i%100 == 0:
                 print 'iter', i
                 mse = self.current_net.mse_q(t[:,0:3], -t[:,3][:,np.newaxis])
-                print 'mse', mse
-                mses.append(mse)
+                learn_rate = self.current_net.get_learn_rate()
+                print 'mse', mse, 'learn_rate', learn_rate
+                self.mse_hist.append(mse)
+                self.learn_rate_hist.append(learn_rate)
             else:
                 self.current_net.train(t[:,0:3], -t[:,3][:,np.newaxis])
 
@@ -230,15 +247,22 @@ class NNController:
 
         for i in range(4000):
             print 'iteration', i
-            self.train_once(i % 50 == 0)
+            self.train_once(i % self.mse_freq == 0)
             self.maybe_update_old_net()
 
     def run_matlab(self):
         print "ready for matlab"
+
+        '''
+        sa_costs = None
+        with open('dp_sa_cost.p', 'rb') as f:
+            sa_costs = pickle.load(f)
+            '''
+
         while True:
             start_time = time.time()
             while not os.path.isfile(self.matlab_state_file):
-                if time.time() - start_time > 10:
+                if time.time() - start_time > 30:
                     print "timeout"
                     self.current_net.save_model(self.save_path)
                     self.profiler.toc('total controller run time')
@@ -255,9 +279,13 @@ class NNController:
             #print lines
             reward_str = lines[0].rstrip()
             reward = float(reward_str)
+            if reward > 0 and not self.succeeded and sim_t >= 0.05:
+                logging.info('succeeded, reward=%s, sim_t=%s, state=%s', reward, sim_t, state)
+                self.succeeded = True
 
             state_strs = lines[1].rstrip().split(' ')
             state = np.array(map(float, state_strs))
+            print 'state', state
 
             sim_t = float(lines[2].rstrip())
             if sim_t < 0.001:
@@ -270,13 +298,18 @@ class NNController:
                     self.s_hists.append(self.current_s_hist)
                     self.current_a_hist = []
                     self.current_s_hist = []
+                    if not self.succeeded:
+                        logging.info('didn\'t succeed :(')
+                    self.succeeded = False
 
             self.train_t += self.sim_dt
 
             os.remove(self.matlab_state_file)
 
-            print 'iter', self.time_step, 'train_t', self.train_t, 'sim_t', sim_t, 'epsilon', self.epsilon, \
-                    'times_trained', self.times_trained, 'net_update_count', self.net_update_count
+            print 'iter', self.time_step, 'train_t', self.train_t, 'sim_t', sim_t, \
+                    'epsilon', self.epsilon, 'times_trained', self.times_trained, \
+                    'net_update_count', self.net_update_count, \
+                    'learn_rate', self.current_net.get_learn_rate()
 
             self.profiler.tic('nn_cycle')
             if self.last_state != None:
@@ -298,12 +331,15 @@ class NNController:
                     action = self.current_net.get_best_a_p(state, is_p=False,
                             init_a = np.array([[self.last_action]]), num_tries=1)[0][0][0]
 
-                    '''
-                    aq = self.old_net.manual_max_a(state)
-                    #print aq
-                    #best_q = aq[:,1][:,np.newaxis]
-                    action = aq[0]
-                    '''
+                    #aq = self.old_net.manual_max_a(state)
+                    ##print aq
+                    ##best_q = aq[:,1][:,np.newaxis]
+                    #action = aq[0]
+
+                    #i = int(state[0] / (2*np.pi /50))
+                    #j = int((state[1] + 10) / 0.4)
+                    #action = -2 + 0.5 * np.argmin(sa_costs[:,51*j + i])
+                    #print state, i, j, action
 
                     self.profiler.toc('action')
                 else:
@@ -320,7 +356,7 @@ class NNController:
 
             self.profiler.tic('nn_cycle1')
             if self.train_t > 0.0 and self.train_t - self.last_train_time > self.min_train_gap:
-                self.train_once(self.times_trained % 20 == 0)
+                self.train_once(self.times_trained % self.mse_freq == 0)
 
             f = open(self.python_action_file, 'w')
             f.write('%s\n' % action)
@@ -335,9 +371,10 @@ class NNController:
 
 if __name__ == '__main__':
     #c = NNController(load_path=None, conf='pendulum.conf')
-    ##c.run_dp_train()
+    #c.run_dp_train()
+
     #c.run_no_matlab('t1.p')
 
-    #c = NNController(load_path='models/model_48657.out', conf='exploit_pendulum.conf')
-    c = NNController(load_path='models/model_39574.out', conf='exploit_pendulum.conf')
+    c = NNController(load_path=None, conf='acrobot.conf')
+    #c = NNController(load_path='good_models/dp_trained_pendulum_net.out', conf='exploit_pendulum.conf')
     c.run_matlab()

@@ -1,4 +1,5 @@
 import time
+import logging
 import numpy as np
 import contextlib
 import sys
@@ -61,10 +62,18 @@ def read_conf(file_name):
                 continue
             assert len(a) == 3
             assert a[1] == '='
-            if '.' in a[2]:
-                ans[a[0]] = float(a[2])
+
+            s = a[2]
+            if "'" in s or '"' in s:
+                assert s[0] == s[-1]
+                assert s[0] in ['"', "'"]
+                for i in s[1:-1]:
+                    assert i != s[0]
+                ans[a[0]] = s[1:-1]
+            elif '.' in s:
+                ans[a[0]] = float(s)
             else:
-                ans[a[0]] = int(a[2])
+                ans[a[0]] = int(s)
 
 
     print 'conf read:', file_name

@@ -1,20 +1,22 @@
-classdef NNController < DrakeSystem
+classdef NNAcrobotController < DrakeSystem
 
   properties
     p
     matlab_state_file
     python_action_file
+    hit_top
   end
 
   methods
-    function obj = NNController(plant)
+    function obj = NNAcrobotController(plant)
 
-      obj = obj@DrakeSystem(0,0,2,1,true,false); %%true?
+      obj = obj@DrakeSystem(0,0,4,1,true,false); %%true?
       obj.p = plant;
-      obj.matlab_state_file = strcat(pwd,'/matlab_state_file.out');
-      obj.python_action_file = strcat(pwd,'/python_action_file.out');
+      obj.matlab_state_file = strcat(pwd,'/../NN/matlab_state_file.out');
+      obj.python_action_file = strcat(pwd,'/../NN/python_action_file.out');
       obj = obj.setInputFrame(plant.getStateFrame);
       obj = obj.setOutputFrame(plant.getInputFrame);
+      obj.hit_top = 0;
     end
 
     % function x0 = getInitialState(obj)
@@ -26,11 +28,15 @@ classdef NNController < DrakeSystem
     % end
 
     function r = reward(obj,x)
-      new_x = mod(x(1), 2*pi)
-      %dist = (new_x - pi)^2
-      dist = cos(new_x)
-      speed = x(2)^2
-      r = -dist
+      h = 3 - (obj.p.l1 * cos(x(1)) + obj.p.l2 * cos(x(1) + x(2)));
+      if h > 5.7
+        r = 1
+        h
+        x
+      else
+        r = 0;
+      end
+
 
       %if cos(x(1)) < -0.9 & abs(x(2)) < 0.2
       %  r = 1
@@ -46,11 +52,19 @@ classdef NNController < DrakeSystem
       f = fopen(obj.matlab_state_file, 'w');
       x_new = x;
       x_new(1) = mod(x(1), 2*pi);
-      fprintf(f, '%d\n', obj.reward(x));
+      r = obj.reward(x);
+      fprintf(f, '%d\n', r);
       fprintf(f, '%d ', x_new);
       fprintf(f, '\n');
       fprintf(f, '%d\n', t);
       fclose(f);
+
+      if r == 1
+        if obj.hit_top == 0
+          obj.hit_top = 1
+          fprintf('hit_top at %f', t);
+        end
+      end
 
       % %debug
       % fprintf('writing state\n');

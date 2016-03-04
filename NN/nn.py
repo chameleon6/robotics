@@ -5,7 +5,7 @@ from optimize.snopt7 import SNOPT_solver
 from utils import *
 
 class ControlNN:
-    def __init__(self, load_file=None):
+    def __init__(self, conf, load_path=None):
         tf_random_seed = 40
         nonlinearity = tf.nn.relu
         self.keep_prob_train_val = 1.0
@@ -22,13 +22,21 @@ class ControlNN:
 
         self.snopt = SNOPT_solver()
         self.snopt.setOption('Major print level', 0)
+        #self.snopt.setOption('Major feasibility', 1.0e-6)
+        #self.snopt.setOption('Minor feasibility', 1.0e-6)
+        #self.snopt.setOption('Major optimality', 1.0e-6)
+        #self.snopt.setOption('Linesearch tolerance', 0.9)
+        #self.snopt.setOption('Major iterations', 100)
+        #self.snopt.setOption('Minor iterations', 50)
+        #self.snopt.setOption('Scale option', 0)
+        #self.snopt_max_count = conf['snopt_max_count']
+        self.snopt.setOption('Iteration limit', conf['snopt_max_count'])
 
         self.profiler = Profiler()
 
-        conf = read_conf('pendulum.conf')
-        self.n_s = 2
-        self.n_a = 1
-        self.n_sa = 3
+        self.n_s = conf['n_s']
+        self.n_a = conf['n_a']
+        self.n_sa = self.n_s + self.n_a
         n_hidden = conf['n_hidden']
         self.n_1 = n_hidden
         self.n_2 = n_hidden
@@ -111,8 +119,8 @@ class ControlNN:
         self.init_op = tf.initialize_all_variables()
         self.sess.run(self.init_op)
 
-        if load_file != None:
-            self.load_model(load_file)
+        if load_path != None:
+            self.load_model(load_path)
 
     def __del__(self):
         self.sess.close()
@@ -196,7 +204,7 @@ class ControlNN:
             #    print 'vs', vs
             #    return -1
             #vs['old_a'] = a
-            if vs['count'] > 100:
+            if vs['count'] > self.snopt_max_count:
                 return -1
             return 0
 
@@ -216,7 +224,7 @@ class ControlNN:
                 F = np.array([-self.sess.run(self.q_query_mean_p, feed_dict={self.s_query_p: s,
                     self.a_query_p: a[:,np.newaxis], self.keep_prob: 1.0}), 0])
                 G = grad(a)
-                status = update_tolerance_conditions(a)
+                #status = update_tolerance_conditions(a)
                 return status, F, G
 
             self.snopt.snopta(n=n_batch, nF=2, usrfun=objFG, x0=init_a, xlow=xlow, xupp=xupp,
@@ -246,7 +254,7 @@ class ControlNN:
                 F = np.array([-self.sess.run(self.q_query_mean, feed_dict={self.s_query: s[np.newaxis,:],
                     self.a_query: a[:,np.newaxis], self.keep_prob: 1.0}), 0])
                 G = grad(a)
-                status = update_tolerance_conditions(a)
+                #status = update_tolerance_conditions(a)
                 return status, F, G
 
             self.snopt.snopta(n=n_batch, nF=2, usrfun=objFG, x0=init_a, xlow=xlow, xupp=xupp,
@@ -275,8 +283,10 @@ class ControlNN:
 
         return ans_a, ans_q
 
+    def get_learn_rate(self):
+        return self.sess.run(self.learn_rate)
+
     def mse_q(self, sa_vals, y_vals):
-        print 'learn_rate', self.sess.run(self.learn_rate)
         return self.sess.run(self.learn_error,
                 feed_dict={self.sa_learn: sa_vals, self.y_learn: y_vals, self.keep_prob: 1.0})
 

@@ -10,9 +10,7 @@ profiler = Profiler()
 conf = read_conf('pendulum.conf')
 
 start_time = time.time()
-#save_path = 'models/model_20247.out'
-save_path = 'models/model_35202.out'
-net = ControlNN(save_path)
+net = ControlNN(load_path='models/model_40541.out', conf='pendulum.conf')
 vis = NetVisualizer(net)
 print "compile time", time.time() - start_time
 
@@ -111,5 +109,5 @@ def dp_plot_test():
     xdr = (-10., 10., 51)
     vis.plot_heat_map(xr, xdr, J2)
 
-#summary = max_verification_test(False)
+#summary = max_verification_test(True)
 vis.q_heat_map()

@@ -40,6 +40,7 @@ class ControlNN:
         n_hidden = conf['n_hidden']
         self.n_1 = n_hidden
         self.n_2 = n_hidden
+        self.n_q = conf['n_q']
         self.one_layer_only = True
         self.n_minibatch = conf['minibatch_size']
         self.n_batches = conf['num_batches']
@@ -59,8 +60,8 @@ class ControlNN:
         self.b_1 = bias([self.n_1], 'b_1')
         self.W_1_2 = unif_fanin_mat([self.n_1, self.n_2], 'W_1_2')
         self.b_2 = bias([self.n_2], 'b_2')
-        self.W_2_q = unif_fanin_mat([self.n_2,1], 'W_2_q')
-        self.b_q = bias([1], 'b_q')
+        self.W_2_q = unif_fanin_mat([self.n_2,self.n_q], 'W_2_q')
+        self.b_q = bias([self.n_q], 'b_q')
         name_var_pairs = zip(['W_sa_1', 'b_1', 'W_1_2', 'b_2', 'W_2_q', 'b_q'],
                 [self.W_sa_1, self.b_1, self.W_1_2, self.b_2, self.W_2_q, self.b_q])
         self.name_var_dict = {i:j for (i,j) in name_var_pairs}
@@ -75,8 +76,9 @@ class ControlNN:
 
         self.o1 = nonlinearity(tf.matmul(self.sa_learn, self.W_sa_1) + self.b_1)
         self.q_learn = q_from_input(self.sa_learn)
-        self.y_learn = tf.placeholder(self.floatX, shape = [None, 1])
-        self.learn_error = tf.reduce_mean(tf.square(self.y_learn - self.q_learn))
+        self.y_learn = tf.placeholder(self.floatX, shape = [None, self.n_q])
+        self.learn_delta = tf.square(self.y_learn - self.q_learn)
+        self.learn_error = tf.reduce_mean(self.learn_delta)
 
         self.max_a_time_limit = conf['max_a_time_limit']
 
@@ -85,34 +87,35 @@ class ControlNN:
                 conf['learn_rate_half_life'], 0.5, staircase=False)
         self.learn_opt = tf.train.AdamOptimizer(self.learn_rate).minimize(self.learn_error, global_step=global_step)
 
-        def query_setup(n_sample):
-            s_query = tf.placeholder('float', shape=[n_sample, self.n_s])
-            a_query = unif_fanin_mat([n_sample, self.n_a], 'a_query')
-            min_cutoff = tf.matmul(np.ones((n_sample, 1), dtype=self.floatX), self.min_torques)
-            max_cutoff = tf.matmul(np.ones((n_sample, 1), dtype=self.floatX), self.max_torques)
-            # print "min cutoff:", self.sess.run(min_cutoff)
-            # print "max cutoff:", self.sess.run(max_cutoff)
-            a_query_clipped = tf.minimum(tf.maximum(min_cutoff, a_query), max_cutoff)
+        if self.n_a > 0:
+            def query_setup(n_sample):
+                s_query = tf.placeholder('float', shape=[n_sample, self.n_s])
+                a_query = unif_fanin_mat([n_sample, self.n_a], 'a_query')
+                min_cutoff = tf.matmul(np.ones((n_sample, 1), dtype=self.floatX), self.min_torques)
+                max_cutoff = tf.matmul(np.ones((n_sample, 1), dtype=self.floatX), self.max_torques)
+                # print "min cutoff:", self.sess.run(min_cutoff)
+                # print "max cutoff:", self.sess.run(max_cutoff)
+                a_query_clipped = tf.minimum(tf.maximum(min_cutoff, a_query), max_cutoff)
 
-            #sa_query = tf.concat(1, [s_query, a_query_clipped])
-            sa_query = tf.concat(1, [s_query, a_query])
-            q_query = q_from_input(sa_query)
-            q_query_mean = tf.reduce_mean(q_query)
+                #sa_query = tf.concat(1, [s_query, a_query_clipped])
+                sa_query = tf.concat(1, [s_query, a_query])
+                q_query = q_from_input(sa_query)
+                q_query_mean = tf.reduce_mean(q_query)
 
-            query_opt = tf.train.AdamOptimizer(0.1)
-            query_grads_and_vars = query_opt.compute_gradients(q_query_mean, [a_query])
-            # list of tuples (gradient, variable).
-            query_grads_and_vars[0] = (-query_grads_and_vars[0][0], query_grads_and_vars[0][1])
-            apply_query_grads = query_opt.apply_gradients(query_grads_and_vars)
-            return s_query, a_query, a_query_clipped, sa_query, q_query, q_query_mean, apply_query_grads
+                query_opt = tf.train.AdamOptimizer(0.1)
+                query_grads_and_vars = query_opt.compute_gradients(q_query_mean, [a_query])
+                # list of tuples (gradient, variable).
+                query_grads_and_vars[0] = (-query_grads_and_vars[0][0], query_grads_and_vars[0][1])
+                apply_query_grads = query_opt.apply_gradients(query_grads_and_vars)
+                return s_query, a_query, a_query_clipped, sa_query, q_query, q_query_mean, apply_query_grads
 
-        self.s_query, self.a_query, self.a_query_clipped, self.sa_query, self.q_query, \
-                self.q_query_mean, self.apply_query_grads = query_setup(1)
-        self.s_query_p, self.a_query_p, self.a_query_clipped_p, self.sa_query_p, self.q_query_p, \
-                self.q_query_mean_p, self.apply_query_grads_p = query_setup(self.n_megabatch)
+            self.s_query, self.a_query, self.a_query_clipped, self.sa_query, self.q_query, \
+                    self.q_query_mean, self.apply_query_grads = query_setup(1)
+            self.s_query_p, self.a_query_p, self.a_query_clipped_p, self.sa_query_p, self.q_query_p, \
+                    self.q_query_mean_p, self.apply_query_grads_p = query_setup(self.n_megabatch)
 
-        self.sym_grad_p = tf.gradients(self.q_query_mean_p, self.a_query_p)
-        self.sym_grad = tf.gradients(self.q_query_mean, self.a_query)
+            self.sym_grad_p = tf.gradients(self.q_query_mean_p, self.a_query_p)
+            self.sym_grad = tf.gradients(self.q_query_mean, self.a_query)
 
         self.saver = tf.train.Saver(self.name_var_dict)
 
@@ -285,6 +288,10 @@ class ControlNN:
 
     def get_learn_rate(self):
         return self.sess.run(self.learn_rate)
+
+    def learn_delta_q(self, sa_vals, y_vals):
+        return self.sess.run(self.learn_delta,
+                feed_dict={self.sa_learn: sa_vals, self.y_learn: y_vals, self.keep_prob: 1.0})
 
     def mse_q(self, sa_vals, y_vals):
         return self.sess.run(self.learn_error,

@@ -73,10 +73,17 @@ class NNController:
 
         self.transitions = TransitionContainer(conf['max_history_len'])
 
-        with open(conf['ref_transitions_file'], 'rb') as f:
-            self.all_ref_transitions = pickle.load(f)
-        np.random.shuffle(self.all_ref_transitions)
-        self.ref_transitions = self.all_ref_transitions[:self.n_megabatch]
+        if 'ref_transitions_file' in conf:
+            with open(conf['ref_transitions_file'], 'rb') as f:
+                self.all_ref_transitions = pickle.load(f)
+            np.random.shuffle(self.all_ref_transitions)
+            self.ref_transitions = self.all_ref_transitions[:self.n_megabatch]
+
+        if 'action_net_file' in conf:
+            self.action_net = ControlNN(conf, load_path=conf['action_net_file'])
+        else:
+            self.action_net = ControlNN(conf, load_path=None)
+
         #print self.ref_transitions
 
         #self.load_path = 'models/model_31275.out'
@@ -197,6 +204,43 @@ class NNController:
         with open(filename, 'wb') as f:
             pickle.dump(self.transitions.container, f)
 
+    def run_action_train(self):
+        self.profiler.tic('data load')
+        xs, us = pickle.load(open('simbicon_train_data.p', 'rb'))
+        self.profiler.toc('data load')
+
+        n_test = 10000
+
+        inds = np.array(range(len(xs)))
+        np.random.shuffle(inds)
+        xs = xs[inds]
+        us = us[inds]
+        #test_inds = np.random.choice(range(n_train), n_test, False)
+        x_test, u_test = xs[:n_test], us[:n_test]
+        xs, us = xs[n_test:], us[n_test:]
+        assert len(xs) == len(us)
+
+        n_train = len(xs)
+        n_batch = self.n_minibatch
+        print n_train
+
+        for ep in range(30):
+            self.profiler.tic('epoch')
+            print 'epoch', ep
+            mse = self.action_net.mse_q(x_test, u_test)
+            self.mse_hist.append(mse)
+            print 'mse', mse, 'learn_rate', self.action_net.get_learn_rate()
+            delta = self.action_net.learn_delta_q(x_test, u_test)
+            #print 'test_us', u_test
+            #print 'delta', delta, delta.shape
+            for j in range(n_train/n_batch):
+                if j % 1000 == 0:
+                    print j
+                s = slice(j * n_batch, (j+1)*n_batch, 1)
+                self.action_net.train(xs[s], us[s])
+
+            self.profiler.toc('epoch')
+
     def run_dp_train(self):
 
         sa_costs = None
@@ -250,15 +294,9 @@ class NNController:
             self.train_once(i % self.mse_freq == 0)
             self.maybe_update_old_net()
 
-    def run_matlab(self):
+    def run_matlab(self, algo):
+
         print "ready for matlab"
-
-        '''
-        sa_costs = None
-        with open('dp_sa_cost.p', 'rb') as f:
-            sa_costs = pickle.load(f)
-            '''
-
         while True:
             start_time = time.time()
             while not os.path.isfile(self.matlab_state_file):
@@ -276,12 +314,11 @@ class NNController:
             if len(lines) < 3: # file isn't fully written yet
                 continue
 
-            #print lines
             reward_str = lines[0].rstrip()
             reward = float(reward_str)
-            if reward > 0 and not self.succeeded and sim_t >= 0.05:
-                logging.info('succeeded, reward=%s, sim_t=%s, state=%s', reward, sim_t, state)
-                self.succeeded = True
+            # if reward > 0 and not self.succeeded and sim_t >= 0.05:
+            #     logging.info('succeeded, reward=%s, sim_t=%s, state=%s', reward, sim_t, state)
+            #     self.succeeded = True
 
             state_strs = lines[1].rstrip().split(' ')
             state = np.array(map(float, state_strs))
@@ -298,83 +335,94 @@ class NNController:
                     self.s_hists.append(self.current_s_hist)
                     self.current_a_hist = []
                     self.current_s_hist = []
-                    if not self.succeeded:
-                        logging.info('didn\'t succeed :(')
-                    self.succeeded = False
+                    # if not self.succeeded:
+                    #     logging.info('didn\'t succeed :(')
+                    # self.succeeded = False
 
             self.train_t += self.sim_dt
 
             os.remove(self.matlab_state_file)
-
-            print 'iter', self.time_step, 'train_t', self.train_t, 'sim_t', sim_t, \
-                    'epsilon', self.epsilon, 'times_trained', self.times_trained, \
-                    'net_update_count', self.net_update_count, \
-                    'learn_rate', self.current_net.get_learn_rate()
-
-            self.profiler.tic('nn_cycle')
-            if self.last_state != None:
-                self.transitions.append((self.last_state, self.last_action, reward, state))
-                self.current_a_hist.append(action)
-                self.current_s_hist.append(state)
-
-            #if self.train_t - last_self.old_net_update_time > self.old_net_update_time:
-
-            self.maybe_update_old_net()
-            action = None
-            if self.train_t < 0.0:
-                action = 0.0
-            elif self.train_t - self.last_action_time > self.min_action_gap:
-                self.last_action_time = self.train_t
-                if np.random.random() > self.epsilon:
-                    self.profiler.tic('action')
-
-                    action = self.current_net.get_best_a_p(state, is_p=False,
-                            init_a = np.array([[self.last_action]]), num_tries=1)[0][0][0]
-
-                    #aq = self.old_net.manual_max_a(state)
-                    ##print aq
-                    ##best_q = aq[:,1][:,np.newaxis]
-                    #action = aq[0]
-
-                    #i = int(state[0] / (2*np.pi /50))
-                    #j = int((state[1] + 10) / 0.4)
-                    #action = -2 + 0.5 * np.argmin(sa_costs[:,51*j + i])
-                    #print state, i, j, action
-
-                    self.profiler.toc('action')
-                else:
-                    action = self.random_action()
+            if algo == 'rl':
+                action = RL_train_and_action(state)
+            elif algo == 'action_net':
+                action = self.action_net.q_from_sa(state.reshape((1,-1)))[0]
             else:
-                action = self.last_action
+                raise ValueError('Not a valid algo')
 
-            #print 'action', action
-            if self.bang_action == 1:
-                if action > 0.0:
-                    action = self.max_torque
-                else:
-                    action = -self.max_torque
-
-            self.profiler.tic('nn_cycle1')
-            if self.train_t > 0.0 and self.train_t - self.last_train_time > self.min_train_gap:
-                self.train_once(self.times_trained % self.mse_freq == 0)
-
+            print 'action', action
             f = open(self.python_action_file, 'w')
-            f.write('%s\n' % action)
+            f.write('%s\n' % ' '.join(map(str, action)))
             f.close()
-            self.profiler.toc('nn_cycle1')
 
-            self.time_step += 1
-            self.last_state = state
-            self.last_action = action
-            self.profiler.toc('nn_cycle')
-            print
+
+    def RL_train_and_action(self, state):
+        print 'iter', self.time_step, 'train_t', self.train_t, 'sim_t', sim_t, \
+                'epsilon', self.epsilon, 'times_trained', self.times_trained, \
+                'net_update_count', self.net_update_count, \
+                'learn_rate', self.current_net.get_learn_rate()
+
+        self.profiler.tic('nn_cycle')
+        if self.last_state != None:
+            self.transitions.append((self.last_state, self.last_action, reward, state))
+            #self.current_a_hist.append(action)
+            #self.current_s_hist.append(state)
+
+        self.maybe_update_old_net()
+        action = None
+        if self.train_t < 0.0:
+            action = 0.0
+        elif self.train_t - self.last_action_time > self.min_action_gap:
+            self.last_action_time = self.train_t
+            if np.random.random() > self.epsilon:
+                self.profiler.tic('action')
+
+                action = self.current_net.get_best_a_p(state, is_p=False,
+                        init_a = np.array([[self.last_action]]), num_tries=1)[0][0][0]
+
+                #aq = self.old_net.manual_max_a(state)
+                ##print aq
+                ##best_q = aq[:,1][:,np.newaxis]
+                #action = aq[0]
+
+                #i = int(state[0] / (2*np.pi /50))
+                #j = int((state[1] + 10) / 0.4)
+                #action = -2 + 0.5 * np.argmin(sa_costs[:,51*j + i])
+                #print state, i, j, action
+
+                self.profiler.toc('action')
+            else:
+                action = self.random_action()
+        else:
+            action = self.last_action
+
+        #print 'action', action
+        if self.bang_action == 1:
+            if action > 0.0:
+                action = self.max_torque
+            else:
+                action = -self.max_torque
+
+        self.profiler.tic('nn_cycle1')
+        if self.train_t > 0.0 and self.train_t - self.last_train_time > self.min_train_gap:
+            self.train_once(self.times_trained % self.mse_freq == 0)
+
+        self.profiler.toc('nn_cycle1')
+
+        self.time_step += 1
+        self.last_state = state
+        self.last_action = action
+        self.profiler.toc('nn_cycle')
+        return action
 
 if __name__ == '__main__':
     #c = NNController(load_path=None, conf='pendulum.conf')
     #c.run_dp_train()
 
+    c = NNController(load_path=None, conf='simbicon.conf')
+
     #c.run_no_matlab('t1.p')
 
-    c = NNController(load_path=None, conf='acrobot.conf')
     #c = NNController(load_path='good_models/dp_trained_pendulum_net.out', conf='exploit_pendulum.conf')
-    c.run_matlab()
+
+    c.run_matlab('action_net')
+    #c.run_action_train()

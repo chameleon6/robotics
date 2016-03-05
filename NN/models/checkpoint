@@ -1,3 +1,2 @@
-model_checkpoint_path: "models/model_1601.out"
-all_model_checkpoint_paths: "/tmp/model_transfer"
-all_model_checkpoint_paths: "models/model_1601.out"
+model_checkpoint_path: "models/model_37027.out"
+all_model_checkpoint_paths: "models/model_37027.out"

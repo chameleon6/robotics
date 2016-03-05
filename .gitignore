@@ -10,5 +10,6 @@
 *out
 *tmp
 *p
+*log
 /Pendulum/models
 /Pendulum/test.py

@@ -19,21 +19,22 @@ v = r.constructVisualizer;
 v.axis = [-1.0 8.0 -0.1 2.1];
 
 v.display_dt = .05;
-sim_len = 5;
+sim_len = 2;
 
 good_sim_count = 0;
 trajectories = []
 traj_count = 1
 
-for i = 1:100
+for i = 1:10
 
   c = SimbiconController(r);
+  c = SNController(r);
   sys = feedback(r,c);
 
   x0 = Point(sys.getStateFrame());
 
   start_state = 3
-  start_pose = state_targets{start_state} + 0.05 * randn(6,1);
+  start_pose = state_targets{start_state} + 0.1 * ones(6,1); %0.05 * randn(6,1);
   %start_pose = [0.0, 0.25, 0, 0]
 
   x0.torso_pin = start_pose(1);
@@ -45,7 +46,7 @@ for i = 1:100
   x0.base_relative_pitch = 0.1;
   x0.base_z = 1.04;
   x0.base_xdot = 0.3;
-  x0.x1 = 4; %start_state
+  %x0.x1 = 4; %start_state
 
   % Run simulation, then play it back at realtime speed
   xtraj = simulate(sys, [0 sim_len], x0);

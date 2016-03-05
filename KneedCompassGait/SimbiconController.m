@@ -2,6 +2,8 @@ classdef SimbiconController < DrakeSystem
 
   properties
     p
+    out_file
+    out_file_name
   end
 
   methods
@@ -35,6 +37,9 @@ classdef SimbiconController < DrakeSystem
       obj.p = plant;
       obj = obj.setInputFrame(plant.getStateFrame);
       obj = obj.setOutputFrame(plant.getInputFrame);
+      c = clock;
+      obj.out_file_name = sprintf('outputs/%d.out', round(c(6)*10000));
+      obj.out_file = fopen(obj.out_file_name, 'w');
     end
 
     function x0 = getInitialState(obj)
@@ -112,6 +117,16 @@ classdef SimbiconController < DrakeSystem
       alphas_p = p_const*[1; 1; 1; 1; .1; .1];
       alphas_d = 2*sqrt(alphas_p); %d_const*[10; 1; 1; 1; 1; 1];
       u = alphas_p .* (targets - actuals) - alphas_d .* vels;
+      u = u + 3*randn(6,1);
+      u = min(max(u, -50),50);
+
+      if t > 0.01
+        fprintf(obj.out_file, '%f ', x);
+        fprintf(obj.out_file, '\n');
+        fprintf(obj.out_file, '%f ', u);
+        fprintf(obj.out_file, '\n');
+      end
+
 
       %u = Point(obj.p.getInputFrame())
       %[H,C,B] = obj.p.manipulatorDynamics(x(1:2),x(3:4));

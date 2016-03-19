@@ -70,6 +70,7 @@ class NNController:
         self.rmse_rel_hist = []
         self.rmse_rel_hist2 = []
         self.learn_rate_hist = []
+        self.certainty_hist = []
 
         self.transitions = TransitionContainer(conf['max_history_len'])
 
@@ -79,21 +80,40 @@ class NNController:
             np.random.shuffle(self.all_ref_transitions)
             self.ref_transitions = self.all_ref_transitions[:self.n_megabatch]
 
+        action_conf = conf.copy()
+        action_conf['n_a'] = 0
+        action_conf['n_q'] = 6
         if 'action_net_file' in conf:
-            self.action_net = ControlNN(conf, load_path=conf['action_net_file'])
+            print 'loading action net'
+            self.action_net = ControlNN(action_conf, load_path=conf['action_net_file'])
         else:
-            self.action_net = ControlNN(conf, load_path=None)
+            self.action_net = ControlNN(action_conf, load_path=None)
 
-        #print self.ref_transitions
+        sas_conf = conf.copy()
+        sas_conf['n_s'] = conf['n_s'] + conf['n_a']
+        sas_conf['n_q'] = conf['n_s']
+        sas_conf['n_a'] = 0
+        if 'sas_net_file' in conf:
+            print 'loading sas net'
+            self.sas_net = ControlNN(sas_conf, load_path=conf['sas_net_file'])
+        else:
+            self.sas_net = ControlNN(sas_conf, load_path=None)
 
-        #self.load_path = 'models/model_31275.out'
-        #self.load_path = 'models/model_77422.out'
-        self.load_path = load_path
-        self.current_net = ControlNN(conf=conf, load_path=self.load_path)
-        self.old_net = ControlNN(conf=conf, load_path=self.load_path)
+        certainty_conf = conf.copy()
+        certainty_conf['n_q'] = 1
+        certainty_conf['n_a'] = 0
+        if 'certainty_net_file' in conf:
+            print 'loading certainty net'
+            self.certainty_net = ControlNN(certainty_conf, load_path=conf['certainty_net_file'])
+        else:
+            self.certainty_net = ControlNN(certainty_conf, load_path=None)
 
-        self.transfer_path = '/tmp/model_transfer'
-        rand_int = int(time.time() * 10000) % 100000
+        # self.load_path = load_path
+        # self.current_net = ControlNN(conf=conf, load_path=self.load_path)
+        # self.old_net = ControlNN(conf=conf, load_path=self.load_path)
+        # self.transfer_path = '/tmp/model_transfer'
+
+        rand_int = int(time.time() * 10000000) % 100000000
         self.save_path = 'models/model_%s.out' % rand_int
         self.log_path = self.model_name + '.log'
         logging.basicConfig(filename=self.log_path,level=logging.INFO)
@@ -204,12 +224,21 @@ class NNController:
         with open(filename, 'wb') as f:
             pickle.dump(self.transitions.container, f)
 
+    def run_sas_train(self):
+        self.run_net_train(self.sas_net, 'sas_train_data.p')
+
+    def run_certainty_train(self):
+        self.run_net_train(self.certainty_net, 'certainty_train_data.p')
+
     def run_action_train(self):
+        self.run_net_train(self.action_net, 'action_train_data.p')
+
+    def run_net_train(self, net, train_data_file):
         self.profiler.tic('data load')
-        xs, us = pickle.load(open('simbicon_train_data.p', 'rb'))
+        xs, us = pickle.load(open(train_data_file, 'rb'))
         self.profiler.toc('data load')
 
-        n_test = 10000
+        n_test = len(xs) / 10
 
         inds = np.array(range(len(xs)))
         np.random.shuffle(inds)
@@ -227,18 +256,17 @@ class NNController:
         for ep in range(30):
             self.profiler.tic('epoch')
             print 'epoch', ep
-            mse = self.action_net.mse_q(x_test, u_test)
+            mse = net.mse_q(x_test, u_test)
             self.mse_hist.append(mse)
-            print 'mse', mse, 'learn_rate', self.action_net.get_learn_rate()
-            delta = self.action_net.learn_delta_q(x_test, u_test)
+            print 'mse', mse, 'learn_rate', net.get_learn_rate()
+            delta = net.learn_delta_q(x_test, u_test)
             #print 'test_us', u_test
             #print 'delta', delta, delta.shape
             for j in range(n_train/n_batch):
                 if j % 1000 == 0:
                     print j
                 s = slice(j * n_batch, (j+1)*n_batch, 1)
-                self.action_net.train(xs[s], us[s])
-
+                net.train(xs[s], us[s])
             self.profiler.toc('epoch')
 
     def run_dp_train(self):
@@ -322,7 +350,6 @@ class NNController:
 
             state_strs = lines[1].rstrip().split(' ')
             state = np.array(map(float, state_strs))
-            print 'state', state
 
             sim_t = float(lines[2].rstrip())
             if sim_t < 0.001:
@@ -339,13 +366,17 @@ class NNController:
                     #     logging.info('didn\'t succeed :(')
                     # self.succeeded = False
 
+            certainty = self.certainty_net.q_from_sa(state.reshape((1,-1)))[0]
             self.train_t += self.sim_dt
+
+            print 'sim_t', sim_t, 'state', state, 'certainty', certainty
+            self.certainty_hist.append(certainty)
 
             os.remove(self.matlab_state_file)
             if algo == 'rl':
-                action = RL_train_and_action(state)
+                action = self.RL_train_and_action(state)
             elif algo == 'action_net':
-                action = self.action_net.q_from_sa(state.reshape((1,-1)))[0]
+                action = self.action_net_main(state)
             else:
                 raise ValueError('Not a valid algo')
 
@@ -354,6 +385,8 @@ class NNController:
             f.write('%s\n' % ' '.join(map(str, action)))
             f.close()
 
+    def action_net_main(self, state):
+        return self.action_net.q_from_sa(state.reshape((1,-1)))[0]
 
     def RL_train_and_action(self, state):
         print 'iter', self.time_step, 'train_t', self.train_t, 'sim_t', sim_t, \
@@ -424,5 +457,5 @@ if __name__ == '__main__':
 
     #c = NNController(load_path='good_models/dp_trained_pendulum_net.out', conf='exploit_pendulum.conf')
 
-    c.run_matlab('action_net')
-    #c.run_action_train()
+    #c.run_matlab('action_net')
+    c.run_action_train()

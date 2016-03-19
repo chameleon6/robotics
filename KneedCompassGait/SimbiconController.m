@@ -38,7 +38,7 @@ classdef SimbiconController < DrakeSystem
       obj = obj.setInputFrame(plant.getStateFrame);
       obj = obj.setOutputFrame(plant.getInputFrame);
       c = clock;
-      obj.out_file_name = sprintf('outputs/%d.out', round(c(6)*10000));
+      obj.out_file_name = sprintf('outputs/%d.out', round(c(6)*100000000));
       obj.out_file = fopen(obj.out_file_name, 'w');
     end
 

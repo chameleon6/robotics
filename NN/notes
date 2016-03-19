@@ -1,0 +1,3 @@
+s --> a (param A)
+s, a --> s' (fixed, learn this)
+s --> (a,s) --> s'

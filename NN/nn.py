@@ -62,9 +62,14 @@ class ControlNN:
         self.b_2 = bias([self.n_2], 'b_2')
         self.W_2_q = unif_fanin_mat([self.n_2,self.n_q], 'W_2_q')
         self.b_q = bias([self.n_q], 'b_q')
-        name_var_pairs = zip(['W_sa_1', 'b_1', 'W_1_2', 'b_2', 'W_2_q', 'b_q'],
-                [self.W_sa_1, self.b_1, self.W_1_2, self.b_2, self.W_2_q, self.b_q])
+        name_var_pairs = zip(['W_sa_1', 'b_1', 'b_q'],
+                [self.W_sa_1, self.b_1, self.b_q])
+        if not self.one_layer_only:
+            name_var_pairs.extend(zip(['W_1_2', 'b_2', 'W_2_q'], [self.W_1_2, self.b_2, self.W_2_q]))
         self.name_var_dict = {i:j for (i,j) in name_var_pairs}
+
+        # # run collapse once to set number of params
+        # self.collapse_params()
 
         def q_from_input(i):
             o1 = tf.nn.dropout(nonlinearity(tf.matmul(i, self.W_sa_1) + self.b_1), self.keep_prob)
@@ -133,6 +138,16 @@ class ControlNN:
             print name
             print self.sess.run(param)
         print
+
+    #def collapse_params(self):
+    #    self.print_params()
+    #    ans = []
+    #    for (name, param) in enumerate(self.name_var_dict):
+    #        ans.extend(self.sess.run(param).flatten().tolist())
+
+    #    self.num_params = len(ans)
+    #    print self.num_params
+    #    return np.array(ans)
 
     def q_from_sa(self, sa_vals):
         return self.sess.run(self.q_learn, feed_dict={self.sa_learn: sa_vals, self.keep_prob: 1.0})
@@ -306,4 +321,5 @@ class ControlNN:
         self.saver.save(self.sess, save_path)
 
     def load_model(self, load_path):
+        print 'loading model from', load_path
         self.saver.restore(self.sess, load_path)

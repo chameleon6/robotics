@@ -25,7 +25,7 @@ good_sim_count = 0;
 trajectories = []
 traj_count = 1
 
-for i = 1:10
+for i = 1:1
 
   c = SimbiconController(r);
   c = SNController(r);

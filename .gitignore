@@ -12,4 +12,5 @@
 *p
 *log
 /Pendulum/models
+/NN/models
 /Pendulum/test.py

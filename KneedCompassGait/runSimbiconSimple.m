@@ -5,6 +5,7 @@ start_time = cputime;
 options = [];
 options.floating = true;
 options.terrain = RigidBodyFlatTerrain();
+%options.terrain = RigidBodyHeightMapTerrain([0 1 2], [0 1], 0.01*[1 2 3; 4 5 7])
 options.twoD = true;
 options.view = 'right';
 r = TimeSteppingRigidBodyManipulator('KneedCompassGait.urdf', 0.001, options);

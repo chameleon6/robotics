@@ -366,7 +366,7 @@ class NNController:
                     #     logging.info('didn\'t succeed :(')
                     # self.succeeded = False
 
-            certainty = self.certainty_net.q_from_sa(state.reshape((1,-1)))[0]
+            certainty = self.certainty_net.q_from_sa(state.reshape((1,-1)))[0][0]
             self.train_t += self.sim_dt
 
             print 'sim_t', sim_t, 'state', state, 'certainty', certainty
@@ -457,5 +457,6 @@ if __name__ == '__main__':
 
     #c = NNController(load_path='good_models/dp_trained_pendulum_net.out', conf='exploit_pendulum.conf')
 
-    #c.run_matlab('action_net')
-    c.run_action_train()
+    c.run_matlab('action_net')
+    #c.run_certainty_train()
+    #c.run_action_train()

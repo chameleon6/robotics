@@ -19,7 +19,7 @@ v = r.constructVisualizer;
 v.axis = [-1.0 8.0 -0.1 2.1];
 
 v.display_dt = .05;
-sim_len = 2;
+sim_len = 1;
 
 good_sim_count = 0;
 trajectories = []
@@ -34,7 +34,7 @@ for i = 1:1
   x0 = Point(sys.getStateFrame());
 
   start_state = 3
-  start_pose = state_targets{start_state} + 0.1 * ones(6,1); %0.05 * randn(6,1);
+  start_pose = state_targets{start_state} + 0.2 * ones(6,1); %0.05 * randn(6,1);
   %start_pose = [0.0, 0.25, 0, 0]
 
   x0.torso_pin = start_pose(1);

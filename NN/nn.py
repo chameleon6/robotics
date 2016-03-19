@@ -64,8 +64,8 @@ class ControlNN:
         self.b_q = bias([self.n_q], 'b_q')
         name_var_pairs = zip(['W_sa_1', 'b_1', 'b_q'],
                 [self.W_sa_1, self.b_1, self.b_q])
-        if not self.one_layer_only:
-            name_var_pairs.extend(zip(['W_1_2', 'b_2', 'W_2_q'], [self.W_1_2, self.b_2, self.W_2_q]))
+        #if not self.one_layer_only:
+        name_var_pairs.extend(zip(['W_1_2', 'b_2', 'W_2_q'], [self.W_1_2, self.b_2, self.W_2_q]))
         self.name_var_dict = {i:j for (i,j) in name_var_pairs}
 
         # # run collapse once to set number of params

@@ -10,7 +10,8 @@ options.view = 'right';
 %m = PlanarRigidBodyManipulator('KneedCompassGait.urdf', options);
 %r = TimeSteppingRigidBodyManipulator(m,.001);
 r = TimeSteppingRigidBodyManipulator('KneedCompassGait.urdf', 0.001, options);
-out_file = fopen('simbicon_output.out', 'a');
+good_out_file = fopen('good_simbicon_output.out', 'a');
+all_out_file = fopen('all_simbicon_output.out', 'a');
 
 %q = zeros(3,1);
 %qd = zeros(3,1);
@@ -19,7 +20,7 @@ v = r.constructVisualizer;
 v.axis = [-1.0 8.0 -0.1 2.1];
 
 v.display_dt = .05;
-sim_len = 1;
+sim_len = 0.5;
 
 good_sim_count = 0;
 trajectories = []
@@ -27,8 +28,10 @@ traj_count = 1
 
 for i = 1:1
 
-  c = SimbiconController(r);
-  c = SNController(r);
+  clk = clock;
+  model_num = round(clk(6)*1000000)
+  c = SNController(r, true, model_num);
+  %c = SNController(r);
   sys = feedback(r,c);
 
   x0 = Point(sys.getStateFrame());
@@ -48,20 +51,24 @@ for i = 1:1
   x0.base_xdot = 0.3;
   %x0.x1 = 4; %start_state
 
-  % Run simulation, then play it back at realtime speed
   xtraj = simulate(sys, [0 sim_len], x0);
   runtime = cputime - start_time
-  p_opts = struct('slider', true);
-  v.playback(xtraj, p_opts);
+
+  fprintf(all_out_file, '%s\n', c.out_file_name);
+  save(sprintf('trajs/%d.mat', model_num), 'xtraj', 'v')
   x_f = xtraj.eval(sim_len)
+
   if x_f(2) > 0.9
-    fprintf(out_file, '%s\n', c.out_file_name);
+    fprintf(good_out_file, '%s\n', c.out_file_name);
     good_sim_count = good_sim_count + 1
     trajectories{traj_count} = xtraj;
     traj_count = traj_count + 1;
   end
 
-  fclose(c.out_file);
+  p_opts = struct('slider', true);
+  v.playback(xtraj, p_opts);
+
 end
 
-fclose(out_file);
+fclose(good_out_file);
+fclose(all_out_file);

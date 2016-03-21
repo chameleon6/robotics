@@ -330,7 +330,7 @@ class NNController:
             while not os.path.isfile(self.matlab_state_file):
                 if time.time() - start_time > 30:
                     print "timeout"
-                    self.current_net.save_model(self.save_path)
+                    #self.current_net.save_model(self.save_path)
                     self.profiler.toc('total controller run time')
                     self.profiler.print_time_stats()
                     sys.exit()

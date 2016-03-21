@@ -4,12 +4,12 @@ import cPickle as pickle
 
 #good_files = sys.argv[1]
 #output = sys.argv[1]
-output = 'action_train_data'
+output = 'action_train_data.p'
 print 'saving to', output
 
 xs = np.zeros((0, 18))
 us = np.zeros((0, 6))
-for line in open('simbicon_output.out', 'r'):
+for line in open('good_simbicon_files.out', 'r'):
 #for line in open(good_files, 'r'):
     fname = line.strip()
     lines = open(fname, 'r').readlines()

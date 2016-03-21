@@ -322,4 +322,5 @@ class ControlNN:
 
     def load_model(self, load_path):
         print 'loading model from', load_path
-        self.saver.restore(self.sess, load_path)
+        self.saver.restore(self.sess,
+                '/Users/jeffreyyan/drake-distro/drake/examples/NN/' + load_path)

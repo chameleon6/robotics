@@ -9,7 +9,7 @@ print 'saving to', output
 
 xs = np.zeros((0, 18))
 us = np.zeros((0, 6))
-for line in open('good_simbicon_files.out', 'r'):
+for line in open('old_outputs/good_simbicon_files.out', 'r'):
 #for line in open(good_files, 'r'):
     fname = line.strip()
     lines = open(fname, 'r').readlines()

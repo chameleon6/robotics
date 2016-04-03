@@ -4,7 +4,8 @@ start_time = cputime;
 
 options = [];
 options.floating = true;
-options.terrain = RigidBodyFlatTerrain();
+%options.terrain = RigidBodyFlatTerrain();
+options.terrain = RigidBodyStepTerrain([2 0 1 1000 0.1]);
 options.twoD = true;
 options.view = 'right';
 %m = PlanarRigidBodyManipulator('KneedCompassGait.urdf', options);

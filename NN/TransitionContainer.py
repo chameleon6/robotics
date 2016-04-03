@@ -11,5 +11,5 @@ class TransitionContainer:
             self.container = self.container[100:]
 
     def random_sample(self, n):
-        inds = np.random.choice(range(len(self.container)), n, False)
+        inds = np.random.choice(range(len(self.container)), n, True)
         return [self.container[i] for i in inds]

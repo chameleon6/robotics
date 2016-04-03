@@ -31,6 +31,9 @@ class Profiler:
         self.start_times[name] = time.time()
 
     def toc(self, name, thresh=0.0):
+        if name not in self.start_times:
+            return
+
         ans = time.time() - self.start_times[name]
         if name not in self.runtime_stats:
             self.runtime_stats[name] = []
@@ -60,7 +63,7 @@ def read_conf(file_name):
             a = line.strip().split(' ')
             if a[0] == '' or a[0] == '#':
                 continue
-            assert len(a) == 3
+            # assert len(a) == 3
             assert a[1] == '='
 
             s = a[2]
@@ -79,3 +82,16 @@ def read_conf(file_name):
     print 'conf read:', file_name
     print ans
     return ans
+
+def mu_std(ts):
+    mu_ts = np.mean(ts, 0)
+    s_ts = np.std(ts, 0)
+    return mu_ts, s_ts
+
+def standardize(ts, ms_t):
+    mu_ts, s_ts = ms_t
+    return (ts - mu_ts)/s_ts
+
+def unstandardize(ts, ms_t):
+    mu_ts, s_ts = ms_t
+    return ts * s_ts + mu_ts

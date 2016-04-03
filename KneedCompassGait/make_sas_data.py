@@ -23,8 +23,8 @@ print 'saving to', output
 
 profiler = Profiler()
 
-xs = np.zeros((0, 18))
-us = np.zeros((0, 6))
+inputs = np.zeros((0, 18+6))
+outputs = np.zeros((0, 18))
 for line in open('all_simbicon_files.out', 'r'):
 #for line in open(good_files, 'r'):
     fname = line.strip()
@@ -34,24 +34,33 @@ for line in open('all_simbicon_files.out', 'r'):
     x = np.array(lines[::2])
     u = np.array(lines[1::2])
 
-    profiler.tic('c')
+    #profiler.tic('c')
     certainties = certainty_net.q_from_sa(x)
-    profiler.toc('c')
+    #profiler.toc('c')
     # ind of first less than thresh
     for i in range(min_ind, len(certainties)):
         if certainties[i] < certainty_thresh:
             last_ind = i
             break
+
     print len(x), last_ind
+    xmax, umax = np.max(np.abs(x)), np.max(np.abs(u))
+
+    if xmax > 50.1 or umax > 50.1:
+        print xmax, umax
+        print 'skipping', fname
+        continue
 
     x = x[:last_ind]
     u = u[:last_ind]
+    sa = np.concatenate((x,u), 1)[:-1]
+    s = x[1:]
 
-    xs = np.concatenate((xs, x), 0)
-    us = np.concatenate((us, u), 0)
+    inputs = np.concatenate((inputs, sa), 0)
+    outputs = np.concatenate((outputs, s), 0)
 
-print 'max/min u', np.max(us), np.min(us)
-print 'max/min x', np.max(xs), np.min(xs)
-print us.shape, xs.shape
-#pickle.dump((xs, us), open('../NN/simbicon_train_data.p', 'wb'))
-pickle.dump((xs, us), open('../NN/' + output, 'wb'))
+print 'max/min u', np.max(outputs), np.min(outputs)
+print 'max/min x', np.max(inputs), np.min(inputs)
+print outputs.shape, inputs.shape
+#pickle.dump((inputs, outputs), open('../NN/simbicon_train_data.p', 'wb'))
+pickle.dump((inputs, outputs), open('../NN/' + output, 'wb'))

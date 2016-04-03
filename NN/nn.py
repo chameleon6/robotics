@@ -6,7 +6,7 @@ from utils import *
 
 class ControlNN:
     def __init__(self, conf, load_path=None):
-        tf_random_seed = 40
+        tf_random_seed = 3
         nonlinearity = tf.nn.relu
         self.keep_prob_train_val = 1.0
         self.floatX = 'float32'
@@ -41,7 +41,10 @@ class ControlNN:
         self.n_1 = n_hidden
         self.n_2 = n_hidden
         self.n_q = conf['n_q']
-        self.one_layer_only = True
+
+        error_functions = [tf.square, tf.abs]
+        self.error_function = error_functions[conf['error_type']]
+        self.one_layer_only = conf['one_layer_only']
         self.n_minibatch = conf['minibatch_size']
         self.n_batches = conf['num_batches']
         self.n_megabatch = self.n_minibatch * self.n_batches
@@ -52,6 +55,9 @@ class ControlNN:
         self.max_torques_p = np.ones((self.n_megabatch,1)) * np.array([[self.max_abs_torque]], dtype=self.floatX)
         self.min_torques = np.array([[-self.max_abs_torque]], dtype=self.floatX)
         self.min_torques_p = np.ones((self.n_megabatch,1)) * np.array([[-self.max_abs_torque]], dtype=self.floatX)
+
+        self.set_standardizer((np.zeros(self.n_sa), np.ones(self.n_sa)),
+                (np.zeros(self.n_q), np.ones(self.n_q)))
 
         self.sess = tf.Session()
         self.keep_prob = tf.placeholder(self.floatX)
@@ -88,9 +94,20 @@ class ControlNN:
         self.max_a_time_limit = conf['max_a_time_limit']
 
         global_step = tf.Variable(0, trainable=False)
-        self.learn_rate = tf.train.exponential_decay(conf['initial_learn_rate'], global_step,
+        self.learn_rate = tf.train.exponential_decay(
+                conf['initial_learn_rate'] / self.n_minibatch,
+                global_step,
                 conf['learn_rate_half_life'], 0.5, staircase=False)
         self.learn_opt = tf.train.AdamOptimizer(self.learn_rate).minimize(self.learn_error, global_step=global_step)
+
+        self.learn_opts = []
+        self.feed_ys = []
+        for i in range(self.n_q):
+            feed_y = tf.placeholder(self.floatX)
+            self.feed_ys.append(feed_y)
+            learn_error = self.error_function(feed_y - self.q_learn[0,i])
+            learn_opt = tf.train.AdamOptimizer(self.learn_rate).minimize(learn_error, global_step=global_step)
+            self.learn_opts.append(learn_opt)
 
         if self.n_a > 0:
             def query_setup(n_sample):
@@ -133,6 +150,18 @@ class ControlNN:
     def __del__(self):
         self.sess.close()
 
+    def set_standardizer(self, sa_mean_std, q_mean_std):
+        def check_stuff(thing, l):
+            assert len(thing) == 2
+            assert thing[0].shape == thing[1].shape
+            assert len(thing[0].shape) == 1
+            assert thing[1].shape[0] == l
+
+        check_stuff(sa_mean_std, self.n_sa)
+        check_stuff(q_mean_std, self.n_q)
+        self.sa_mean_std = sa_mean_std
+        self.q_mean_std = q_mean_std
+
     def print_params(self):
         for (name, param) in enumerate(self.name_var_dict):
             print name
@@ -150,7 +179,14 @@ class ControlNN:
     #    return np.array(ans)
 
     def q_from_sa(self, sa_vals):
-        return self.sess.run(self.q_learn, feed_dict={self.sa_learn: sa_vals, self.keep_prob: 1.0})
+        net_q = self.sess.run(self.q_learn,
+                feed_dict={self.sa_learn: sa_vals, #standardize(sa_vals, self.sa_mean_std),
+                    self.keep_prob: 1.0})
+        #print net_q.shape
+        #return unstandardize(net_q, self.q_mean_std)
+        return net_q
+
+
 
     def q_query_from_s(self, s_vals):
         return self.sess.run(self.q_query, feed_dict={self.s_query: s_vals[np.newaxis,:], self.keep_prob: 1.0})
@@ -182,6 +218,23 @@ class ControlNN:
         for i in s:
             ans.append(self.manual_max_a(i, xr))
         return np.array(ans)
+
+    def q_from_s_discrete(self, s):
+        return self.q_from_sa(s)
+
+    def q_from_sa_discrete(self, s, a):
+        qs = self.q_from_s_discrete(s)
+        chosen_qs = np.array([r[i] for r,i in zip(qs, a)])
+        return chosen_qs[:, np.newaxis]
+
+    def get_best_a_discrete(self, s):
+        qs = self.q_from_s_discrete(s[np.newaxis,:])
+        return np.argmax(qs)
+
+    def get_best_q_discrete(self, s):
+        assert s.shape[1] == self.n_s
+        qs = self.q_from_s_discrete(s)
+        return np.max(qs, 1)
 
     def get_best_a_p(self, s, is_p, num_tries, init_a=None, tolerance=0.01):
         #TODO: benchmark different init methods
@@ -316,6 +369,11 @@ class ControlNN:
         self.sess.run(self.learn_opt, feed_dict={self.y_learn: y_vals,
             self.sa_learn: sa_vals, self.keep_prob: self.keep_prob_train_val})
         #print 'learn_rate', self.sess.run(self.learn_rate)
+
+    def train_discrete(self, s_vals, a_vals, y_vals):
+        for (s, a, y) in zip(s_vals, a_vals, y_vals):
+            self.sess.run(self.learn_opts[a], feed_dict={self.sa_learn: s[np.newaxis,:],
+                self.feed_ys[a]: y, self.keep_prob: 1.0})
 
     def save_model(self, save_path):
         self.saver.save(self.sess, save_path)

@@ -1,17 +1,13 @@
 function runDirtran
 
 % run dirtran multiple times, reducing slack variable tolerance to zero:
-fprintf('run 1\n');
 [xtraj,utraj,ltraj,v,p]=runDirtranIteration;
-%fprintf('run 2\n');
-%[xtraj,utraj,ltraj,v,p]=runDirtranIteration(xtraj, utraj, ltraj,.1,.1);
-%fprintf('run 3\n');
-%[xtraj,utraj,ltraj,v,p]=runDirtranIteration(xtraj, utraj, ltraj,.01,.01);
-%fprintf('run 4\n');
-%[xtraj,utraj,ltraj,v,p]=runDirtranIteration(xtraj, utraj, ltraj,1e-3,1e-3);
-%fprintf('run 5\n');
-%[xtraj,utraj,ltraj,v,p]=runDirtranIteration(xtraj, utraj, ltraj,0,0,1000);
+[xtraj,utraj,ltraj,v,p]=runDirtranIteration(xtraj, utraj, ltraj,.1,.1);
+[xtraj,utraj,ltraj,v,p]=runDirtranIteration(xtraj, utraj, ltraj,.01,.01);
+[xtraj,utraj,ltraj,v,p]=runDirtranIteration(xtraj, utraj, ltraj,1e-3,1e-3);
+[xtraj,utraj,ltraj,v,p]=runDirtranIteration(xtraj, utraj, ltraj,0,0,1000);
 %v.playback(xtraj,struct('slider',true));
+v.playback(xtraj);
 
 end
 
@@ -20,12 +16,6 @@ function [xtraj,utraj,ltraj,v,p]=runDirtranIteration(xtraj_init, utraj_init, ltr
 
 options.floating = true;
 p = PlanarRigidBodyManipulator('KneedCompassGait.urdf',options);
-
-options.terrain = RigidBodyFlatTerrain();
-options.twoD = true;
-options.view = 'right';
-p = TimeSteppingRigidBodyManipulator('KneedCompassGait.urdf', 0.01, options);
-
 N = 30;
 q0 = [0; 1; 0; 0;0;0;];
 % q0 = [0;cos(pi/16);pi/16;-pi/8;0*pi/8;-pi/8];
@@ -112,12 +102,8 @@ else
 
 %   traj0.lambda = PPtrajectory(foh(linspace(0,tf0,N),zeros(2,N)));
 
-  p.getStateFrame()
-  traj0.x.getOutputFrame()
-
   traj0.x = traj0.x.setOutputFrame(p.getStateFrame);
 end
-
 con.fixtime = 1;
 con.u.lb = p.umin;
 con.u.ub = p.umax;
@@ -170,62 +156,14 @@ end
 
 % options.grad_method='numerical';
 
-%options.grad_test = true;
-%[utraj,xtraj,info] = p.trajectoryOptimization(@cost,@finalcost,x0,utraj0,con,options);
-
-
-%%%%%%%%%%
-
-%T = 3;
-%x0 = [0;0;-10;3*5-2-4.5*9.81;0;0;0;3;3*9.81-5;0];
-
-t_init = linspace(0,T,N);
-
-%% ********YOUR CODE HERE ********
-%% Set the initial guess for x and u, should be dim(x) by N and dim(u) by N
-%% respectively
-%x_init_vec = reshape(x0, [10, 1]) * ones([1, N]);
-%rng(1);
-%u_init_vec = randn([1, N]);
-%% *******************************
-
-
-%traj_init.x = PPTrajectory(foh(t_init,x_init_vec));
-%traj_init.u = PPTrajectory(foh(t_init,u_init_vec))
-%traj_init.x = traj_init.x.setOutputFrame(p.getStateFrame);
-%traj_init.u = traj_init.u.setOutputFrame(p.getInputFrame)
-
-traj_init.x = traj0.x;
-traj_init.u = utraj0;
-
-traj_opt =  DirtranTrajectoryOptimization(p,N,[3 4]);
-
-%traj_opt = traj_opt.addFinalCost(@(tt,x) final_state_obj(p,tt,x));
-traj_opt = traj_opt.addFinalCost(@finalcost);
-
-traj_opt = traj_opt.addRunningCost(@cost);
-%traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
-traj_opt = traj_opt.setSolver('fmincon');
-traj_opt = traj_opt.setSolverOptions('fmincon','Algorithm','sqp');
-
-%catchConstraint = FunctionHandleConstraint([0;0],[0;0],10,@(x) final_state_con(p,x),1);
-%traj_opt = traj_opt.addStateConstraint(catchConstraint,N);
-
 tic
-[xtraj,utraj,z,F,info] = traj_opt.solveTraj(t_init,traj_init);
-toc
-%%%%%%%%%%%
+%options.grad_test = true;
+[utraj,xtraj,info] = p.trajectoryOptimization(@cost,@finalcost,x0,utraj0,con,options);
 
-xtraj
-utraj
-save('test.mat', 'xtraj', 'utraj', 'z', 'F', 'info')
-
-
-%ltraj = xtraj.ltraj;
-%xtraj = xtraj.xtraj;
-ltraj = 0;
-
+ltraj = xtraj.ltraj;
+xtraj = xtraj.xtraj;
 % if (info~=1) error('failed to find a trajectory'); end
+toc
 
 % t = xtraj.getBreaks();
 % t = linspace(t(1),t(end),100);
@@ -241,10 +179,10 @@ end
 
 
 
-function [g,dg] = cost(dt,x,u,sys);
-  R = 1;
-  g = dt*sum((R*u).*u,1);
-  dg = [g/dt, zeros(1,size(x,1)),2*dt*u'*R];
+      function [g,dg] = cost(dt,x,u,sys);
+        R = 1;
+        g = dt*sum((R*u).*u,1);
+        dg = [g/dt, zeros(1,size(x,1)),2*dt*u'*R];
 %         g_i = sum(abs(R*u.*x([11 10 12])));
 %         g = g_i*dt;
 %         dg = [g_i, zeros(1,9), R*dt*(sign(x(10:12)).*abs(u([2 1 3])))', R*dt*(sign(u).*abs(x([11 10 12])))'];
@@ -253,13 +191,13 @@ function [g,dg] = cost(dt,x,u,sys);
 %         R_dt = 100000;
 %         g = g + R_dt*dt^2;
 %         dg(1) = dg(1) + 2*R_dt*dt;
-  return;
-end
+        return;
+      end
 
-function [h,dh] = finalcost(t,x)
-  R = 5;
-  h = R*t;
-  dh = [R,zeros(1,size(x,1))];
-  return;
-end
+      function [h,dh] = finalcost(t,x)
+        R = 5;
+        h = R*t;
+        dh = [R,zeros(1,size(x,1))];
+        return;
+      end
 

@@ -177,7 +177,6 @@ class NNController:
         s, a, ys = self.parse_transitions(ts)
         #self.profiler.toc('sa_and_ys_time')
 
-        '''
         if compute_mse:
             #self.profiler.tic('test_mse_time1')
             mse1, qs, test_ys = test_mse(self.ref_transitions)
@@ -192,7 +191,6 @@ class NNController:
             self.mse_hist.append(mse1)
             self.rmse_rel_hist.append(rmse_rel1)
             #self.profiler.toc('test_mse_time1')
-            '''
 
         #self.profiler.tic('train_time')
         #self.current_net.train(sa, ys)
@@ -393,7 +391,7 @@ class NNController:
                 print 'iteration', i
                 print 'correct_rate', self.evaluate_simbicon(t)[2]
             #self.train_once(i % 1000 == 0)
-            self.train_once(False)
+            self.train_once(i % 1000 == 0)
             self.maybe_update_old_net()
 
     def run_matlab(self, algo):
@@ -430,28 +428,12 @@ class NNController:
 
             state_strs = lines[1].rstrip().split(' ')
             state = np.array(map(float, state_strs))
+            state = self.standardize_state(state)
 
             self.sim_t = float(lines[2].rstrip())
 
             if reward != 0.0:
                 print 'received reward', reward, 'at time', self.sim_t #, 'x', state[0]
-            if reward == -1.0:
-                print 'sim failed at time', self.sim_t
-
-            if self.sim_t == 0.001:
-                self.last_state = None
-                if self.train_t > self.sim_start_time + self.sim_dt*3:
-                    print 'new sim', self.sim_num, 'self.train_t', self.train_t
-                    self.sim_start_time = self.train_t
-                    self.sim_num += 1
-                    if self.sim_num > 0:
-                        self.a_hists.append(self.current_a_hist)
-                        self.s_hists.append(self.current_s_hist)
-                        self.current_a_hist = []
-                        self.current_s_hist = []
-                    # if not self.succeeded:
-                    #     logging.info('didn\'t succeed :(')
-                    # self.succeeded = False
 
             #certainty = self.certainty_net.q_from_sa(state.reshape((1,-1)))[0][0]
             self.train_t += self.sim_dt
@@ -473,6 +455,17 @@ class NNController:
             f.write('%s\n' % action)
             f.close()
 
+            if reward == -1.0:
+                print 'sim failed at time', self.sim_t
+                self.last_state = None
+                print 'new sim', self.sim_num, 'self.train_t', self.train_t
+                self.sim_start_time = self.train_t
+                self.sim_num += 1
+                self.a_hists.append(self.current_a_hist[:])
+                self.s_hists.append(self.current_s_hist[:])
+                self.current_a_hist = []
+                self.current_s_hist = []
+
     def action_net_main(self, state):
         return self.action_net.q_from_sa(state.reshape((1,-1)))[0]
 
@@ -484,6 +477,13 @@ class NNController:
             if x == y:
                 count += 1
         return np.array(pred), np.array(actual), count/float(len(pred))
+
+    def standardize_state(self, s):
+        return (s - self.s_mean) / self.s_std
+
+    def set_standardizer(self, s):
+        self.s_std = np.std(s, 0)
+        self.s_mean = np.mean(s, 0)
 
     def RL_train_and_action(self, state, reward):
 
@@ -508,14 +508,14 @@ class NNController:
         elif self.train_t - self.last_action_time > self.min_action_gap:
             self.last_action_time = self.train_t
             if np.random.random() > self.epsilon:
-                action = self.current_net.get_best_a_discrete(state)
+                #action = self.current_net.get_best_a_discrete(state)
 
-                #qs = c.current_net.q_from_s_discrete(state[np.newaxis,:])[0]
-                #poss_next_action = (self.last_action + 1) % 4
-                #if qs[poss_next_action] > qs[self.last_action]:
-                #    action = poss_next_action
-                #else:
-                #    action = self.last_action
+                qs = c.current_net.q_from_s_discrete(state[np.newaxis,:])[0]
+                poss_next_action = (self.last_action + 1) % 4
+                if qs[poss_next_action] > qs[self.last_action]:
+                    action = poss_next_action
+                else:
+                    action = self.last_action
 
             else:
                 #action = self.random_action()
@@ -533,7 +533,8 @@ class NNController:
         #self.profiler.tic('nn_cycle1')
         if self.train_t > 0.0 and self.train_t - self.last_train_time > self.min_train_gap\
                 and len(self.transitions.container) > self.n_minibatch:
-            self.train_once(self.times_trained % self.mse_freq == 0)
+            #self.train_once(self.times_trained % self.mse_freq == 0)
+            self.train_once(False)
 
         #self.profiler.toc('nn_cycle1')
 
@@ -546,12 +547,14 @@ class NNController:
 if __name__ == '__main__':
 
     c = NNController(conf='simbicon.conf')
-    file_nums = [37162113, 23784567, 50082242, 15798237, 7391689, 41484959, 33333319, 59125168, 24751219, 53399322, 22164425, 50931795, 20485990, 49859198]
+    #file_nums = [37162113, 23784567, 50082242, 15798237, 7391689, 41484959, 33333319, 59125168, 24751219, 53399322, 22164425, 50931795, 20485990, 49859198]
+    file_nums = [56385034, 9381058]
     files = ['../KneedCompassGait/outputs/%d.out' % i for i in file_nums]
     t = c.load_simbicon_transitions(files)
     s = np.array([i[0] for i in t])
+    c.set_standardizer(s)
     qs = c.current_net.q_from_s_discrete(s)
-    c.transitions.container = t[:]
+    #c.transitions.container = c.standardize_state()
 
     #c.run_no_matlab(files, t)
     #pred, actual, rate = c.evaluate_simbicon(t)

@@ -119,14 +119,6 @@ classdef SNController < DrakeSystem
         [left_h, left_x] = obj.left_foot_coords(x);
         [right_h, right_x] = obj.right_foot_coords(x);
 
-        if mod(int16(t*1000), 100) == 0
-          t
-          left_h
-          left_x
-          right_h
-          right_x
-        end
-
         should_update = false;
         if state == 1 || state == 3
           should_update = time_up;
@@ -160,14 +152,17 @@ classdef SNController < DrakeSystem
       global sim_failed;
       global sim_fail_time;
       global last_reward_x_step;
+      [left_h, left_x] = obj.left_foot_coords(x);
+      [right_h, right_x] = obj.right_foot_coords(x);
 
       if x(2) > 0.9 & x(2) < 1.05
         % r = x(2) + x(10);
         % r = x(2) + x(10)/3;
         num_x_steps = floor(x(1)/obj.reward_x_step);
-        if num_x_steps > last_reward_x_step
+        if num_x_steps > last_reward_x_step & left_x * right_x < 0
           last_reward_x_step = num_x_steps;
-          r = 1;
+          t
+          r = 1
         else
           r = 0;
         end
@@ -185,7 +180,7 @@ classdef SNController < DrakeSystem
       left_contact = left_h < 0.0005;
       [right_h, right_x] = obj.right_foot_coords(x);
       right_contact = right_h < 0.0005;
-      x_new = [x(2:end); left_contact; right_contact];
+      x_new = [x(2:end); left_contact; right_contact; left_x; right_x];
     end
 
     function write_state(obj,x,t)
@@ -316,7 +311,7 @@ classdef SNController < DrakeSystem
         alphas_p = p_const*[0.1; 1; 1; 1; .1; .1];
         alphas_d = 2*sqrt(alphas_p); %d_const*[10; 1; 1; 1; 1; 1];
         u = alphas_p .* (targets - actuals) - alphas_d .* vels;
-        u = u + 3*randn(6,1);
+        % u = u + 3*randn(6,1);
         u = min(max(u, -50),50);
       end
 

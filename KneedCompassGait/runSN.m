@@ -26,14 +26,15 @@ v = r.constructVisualizer;
 v.axis = [-1.0 8.0 -0.1 2.1];
 
 v.display_dt = .05;
-sim_len = 2.0;
+sim_len = 3.0;
 
 good_sim_count = 0;
-trajectories = []
-traj_count = 1
-model_nums = []
+trajectories = [];
+traj_count = 1;
+model_nums = [];
+good_traj_inds = [];
 
-for i = 1:1
+for i = 1:30
 
   tic
 
@@ -43,7 +44,7 @@ for i = 1:1
 
   clk = clock;
   model_num = round(clk(6)*1000000);
-  c = SNController(r, 0, model_num, 0.01);
+  c = SNController(r, 2, model_num, 0.01);
   c = setSampleTime(c, [0.001;0]);
   %c = SNController(r);
   sys = feedback(r,c);
@@ -111,7 +112,10 @@ for i = 1:1
   end
 
   p_opts = struct('slider', true);
-  v.playback(xtraj, p_opts);
+  %v.playback(xtraj, p_opts);
+  if sim_fail_time > 2.0
+    good_traj_inds = [good_traj_inds i];
+  end
 
 end
 

@@ -4,6 +4,7 @@ global sim_failed;
 global state_targets;
 global current_target_state;
 global last_reward_x_step;
+global log;
 start_time = cputime;
 
 options = [];
@@ -26,7 +27,7 @@ v = r.constructVisualizer;
 v.axis = [-1.0 8.0 -0.1 2.1];
 
 v.display_dt = .05;
-sim_len = 3.0;
+sim_len = 0.5;
 
 good_sim_count = 0;
 trajectories = [];
@@ -34,7 +35,10 @@ traj_count = 1;
 model_nums = [];
 good_traj_inds = [];
 
-for i = 1:30
+for i = 1:3
+
+  fprintf('sim %d', i);
+  log = zeros(4,0);
 
   tic
 
@@ -52,9 +56,9 @@ for i = 1:30
   x0 = Point(sys.getStateFrame());
 
   if mod(i, 2) == 0
-    start_state = 3
+    start_state = 3;
   else
-    start_state = 1
+    start_state = 1;
   end
 
   start_pose = state_targets{start_state}; % + 0.01 * randn(6,1);
@@ -73,9 +77,9 @@ for i = 1:30
   end
   x0.base_z = 1.04;
   x0.base_zdot = 0.0;
-  x0.base_xdot = 0.3;
+  x0.base_xdot = 0.4;
   x0.x1 = mod(start_state,4) + 1; %start_state
-  x0.base_z = x0.base_z - min(c.left_foot_height(x0), c.right_foot_height(x0)) + 0.01
+  x0.base_z = x0.base_z - min(c.left_foot_height(x0), c.right_foot_height(x0)) + 0.01;
 
   current_target_state = x0.x1;
 
@@ -97,7 +101,7 @@ for i = 1:30
   runtime = cputime - start_time
 
   fprintf(all_out_file, '%s\n', c.out_file_name);
-  x_f = xtraj.eval(sim_len)
+  x_f = xtraj.eval(sim_len);
 
   fprintf(good_out_file, '%s\n', c.out_file_name);
   %good_sim_count = good_sim_count + 1
@@ -112,10 +116,18 @@ for i = 1:30
   end
 
   p_opts = struct('slider', true);
-  %v.playback(xtraj, p_opts);
+  v.playback(xtraj, p_opts);
   if sim_fail_time > 2.0
     good_traj_inds = [good_traj_inds i];
   end
+
+
+  % figure
+  % hold on;
+  % plot(log(1,:), 'r')
+  % plot(log(2,:), 'r')
+  % plot(log(3,:), 'b')
+  % plot(log(4,:), 'g')
 
 end
 

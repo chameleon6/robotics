@@ -49,14 +49,14 @@ classdef SNController < DrakeSystem
       obj = obj@DrakeSystem(0,2,18,6,true,false);
       % y(3) = last_rewarded x_step
 
-      obj.reward_x_step = 0.2
+      obj.reward_x_step = 0.2;
       obj.matlab_state_file = strcat(pwd,'/../NN/matlab_state_file.out');
       obj.python_action_file = strcat(pwd,'/../NN/python_action_file.out');
       obj.p = plant;
       obj = obj.setInputFrame(plant.getStateFrame);
       obj = obj.setOutputFrame(plant.getInputFrame);
       c = clock;
-      obj.out_file_name = sprintf('outputs/%d.out', model_num)
+      obj.out_file_name = sprintf('outputs/%d.out', model_num);
       obj.out_file = fopen(obj.out_file_name, 'a');
       obj.use_net = use_net;
       obj.output_dt = output_dt;
@@ -147,30 +147,44 @@ classdef SNController < DrakeSystem
     %  ts = [0.001 0; 0 0];
     %end
 
-    function r = reward(obj,x,t)
+    function [r, term] = reward(obj,x,t)
 
       global sim_failed;
       global sim_fail_time;
       global last_reward_x_step;
+      global log;
       [left_h, left_x] = obj.left_foot_coords(x);
       [right_h, right_x] = obj.right_foot_coords(x);
 
-      if x(2) > 0.9 & x(2) < 1.05
-        % r = x(2) + x(10);
-        % r = x(2) + x(10)/3;
-        num_x_steps = floor(x(1)/obj.reward_x_step);
-        if num_x_steps > last_reward_x_step & left_x * right_x < 0
-          last_reward_x_step = num_x_steps;
-          t
-          r = 1
-        else
-          r = 0;
-        end
+      [c,J] = obj.p.getCOM(x);
+      qd = x(10:end);
+      px = sqrt(c(2)/9.81)*J*qd;
+      px = px(1);
+      log = [log [(left_x+right_x)/2; x(10)-0.5; c(1)-x(1)]];
+      %log = [log x(10)];
+
+      if x(2) > 0.85 & x(2) < 1.05 & x(10) > 0
+        %num_x_steps = floor(x(1)/obj.reward_x_step);
+        %if num_x_steps > last_reward_x_step & left_x * right_x < 0 & x(10) > 0.5
+        %  last_reward_x_step = num_x_steps;
+        %  t
+        %  r = 1
+        %  x
+        %else
+        %  r = 0;
+        %end
+
+        %r = -(c(1) - (left_x + right_x)/2)^2;
+        r1 = -(x(10)-0.5)^2
+        r2 = -(left_x+right_x)^2
+        r = r1+r2
+        term = 0;
       else
         if ~sim_failed
           sim_failed = true;
           sim_fail_time = t;
-          r = -1;
+          r = -1000;
+          term = 1;
         end
       end
     end
@@ -188,8 +202,9 @@ classdef SNController < DrakeSystem
       x_new = obj.transform_state(x);
       f = fopen(obj.matlab_state_file, 'w');
       %x_new(1) = mod(x(1), 2*pi);
-      r = obj.reward(x,t);
-      fprintf(f, '%d\n', r);
+      [r, term] = obj.reward(x,t);
+      fprintf(f, '%f\n', r);
+      fprintf(f, '%d\n', term);
       fprintf(f, '%d ', x_new);
       fprintf(f, '\n');
       fprintf(f, '%d\n', t);
@@ -280,7 +295,8 @@ classdef SNController < DrakeSystem
           state_ind = -1;
           if obj.use_net == 0
             state_ind = y(1);
-            fprintf(obj.out_file, '%f ', obj.reward(x,t));
+            [r, term] = obj.reward(x,t);
+            fprintf(obj.out_file, '%f ', r);
             fprintf(obj.out_file, '\n');
             fprintf(obj.out_file, '%.10f ', obj.transform_state(x));
             fprintf(obj.out_file, '\n');

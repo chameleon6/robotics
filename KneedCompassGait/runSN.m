@@ -27,7 +27,7 @@ v = r.constructVisualizer;
 v.axis = [-1.0 8.0 -0.1 2.1];
 
 v.display_dt = .05;
-sim_len = 0.5;
+sim_len = 3.0;
 
 good_sim_count = 0;
 trajectories = [];
@@ -35,7 +35,7 @@ traj_count = 1;
 model_nums = [];
 good_traj_inds = [];
 
-for i = 1:3
+for i = 1:2
 
   fprintf('sim %d', i);
   log = zeros(4,0);
@@ -48,7 +48,7 @@ for i = 1:3
 
   clk = clock;
   model_num = round(clk(6)*1000000);
-  c = SNController(r, 2, model_num, 0.01);
+  c = SNController(r, 0, model_num, 0.01);
   c = setSampleTime(c, [0.001;0]);
   %c = SNController(r);
   sys = feedback(r,c);
@@ -80,8 +80,14 @@ for i = 1:3
   x0.base_xdot = 0.4;
   x0.x1 = mod(start_state,4) + 1; %start_state
   x0.base_z = x0.base_z - min(c.left_foot_height(x0), c.right_foot_height(x0)) + 0.01;
-
   current_target_state = x0.x1;
+  if mod(i,2) == 1
+    x0.x1 = 3;
+    x0(1:18) = [0.0468806517 0.9790945205 -0.2809296345 0.4501658481 0.3531906305 1.8765274998 0.3031821861 0.2717239432 1.8953324087 0.5239818314 0.1212185094 0.9164383372 -1.7226071413 -0.7483170075 0.1319860563 -0.4583902179 -0.5088036654 -0.8196593879]';
+  else
+    x0.x1 = 1;
+    x0(1:18) = [0.0469637621 0.9796903126 0.0311596662 0.1102139609 0.2570784222 1.8951171387 -0.3085394053 0.3466207104 1.8773049595 0.5485918090 0.0983200806 0.4300624030 -1.2206228038 -0.2200556142 -0.9222081983 0.3696568784 -0.4707305204 0.1364917715]';
+  end
 
   %x0.torso_pin = start_pose(1);
   %x0.hip_pin = start_pose(2);

@@ -160,30 +160,33 @@ classdef SNController < DrakeSystem
       qd = x(10:end);
       px = sqrt(c(2)/9.81)*J*qd;
       px = px(1);
-      log = [log [(left_x+right_x)/2; x(10)-0.5; c(1)-x(1)]];
+      %log = [log [(left_x+right_x)/2; x(10)-0.5; c(1)-x(1)]];
       %log = [log x(10)];
 
-      if x(2) > 0.85 & x(2) < 1.05 & x(10) > 0
-        %num_x_steps = floor(x(1)/obj.reward_x_step);
-        %if num_x_steps > last_reward_x_step & left_x * right_x < 0 & x(10) > 0.5
-        %  last_reward_x_step = num_x_steps;
-        %  t
-        %  r = 1
-        %  x
-        %else
-        %  r = 0;
-        %end
+      if x(2) > 0.9 & x(2) < 1.05 % & x(10) > 0
+        num_x_steps = floor(x(1)/obj.reward_x_step);
+        if num_x_steps > last_reward_x_step & left_x * right_x < 0 & x(10) > 0.5
+          last_reward_x_step = num_x_steps;
+          t
+          r = 1
+          x
+        else
+          r = 0;
+        end
 
         %r = -(c(1) - (left_x + right_x)/2)^2;
-        r1 = -(x(10)-0.5)^2
-        r2 = -(left_x+right_x)^2
-        r = r1+r2
+
+        %r1 = -(x(10)-0.5)^2
+        %r2 = -(left_x+right_x)^2
+        %r = r1+r2
+
         term = 0;
       else
         if ~sim_failed
           sim_failed = true;
           sim_fail_time = t;
-          r = -1000;
+          %r = -1000;
+          r = 0;
           term = 1;
         end
       end

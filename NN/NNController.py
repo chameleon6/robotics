@@ -10,6 +10,7 @@ from utils import *
 from nn import ControlNN
 from TransitionContainer import TransitionContainer
 from NetVisualizer import NetVisualizer
+from matlab_rewards import *
 
 class NNController:
 
@@ -79,6 +80,8 @@ class NNController:
         self.learn_rate_hist = []
         self.certainty_hist = []
 
+        self.action_counts = np.array([1,1,1,1.])
+
         self.transitions = TransitionContainer(conf['max_history_len'])
 
         if 'ref_transitions_file' in conf:
@@ -88,7 +91,7 @@ class NNController:
             self.ref_transitions = self.all_ref_transitions[:1000]
 
         if 'transitions_seed' in conf:
-            self.transitions = pickle.load(open(conf['transitions_seed'], 'wb'))
+            self.transitions.container = pickle.load(open(conf['transitions_seed'], 'rb'))
 
         '''
         action_conf = conf.copy()
@@ -260,6 +263,8 @@ class NNController:
         return a
 
     def random_action_discrete(self):
+        #p = 1.0 / np.sqrt(self.action_counts)
+        #return np.random.choice(range(self.current_net.n_q), p=p/np.sum(p))
         return np.random.choice(range(self.current_net.n_q))
 
     def plot_sim(self, ind):
@@ -386,15 +391,18 @@ class NNController:
         return t
 
     def run_no_matlab(self, files, t):
-        self.transitions.container = []
-        self.transitions.container = self.all_ref_transitions[:]
-        self.transitions.container.extend(self.load_simbicon_transitions(files))
         np.random.shuffle(self.transitions.container)
+        s = np.array([i[0] for i in self.transitions.container])
 
         for i in range(20000):
             if i % 100 == 0:
+                print self.current_net.q_from_s_discrete(s[:20])
                 print 'iteration', i
-                print 'correct_rate', self.evaluate_simbicon(t)[2]
+                rate = self.evaluate_simbicon(t)[2]
+                print 'correct_rate', rate
+                if rate > 0.9:
+                    print 'good rate'
+                    break
             #self.train_once(i % 1000 == 0)
             self.train_once(i % 100 == 0)
             self.maybe_update_old_net()
@@ -468,6 +476,8 @@ class NNController:
             else:
                 raise ValueError('Not a valid algo')
 
+            self.action_counts[action] += 1;
+
             #print 'action', action
             f = open(self.python_action_file, 'w')
             #f.write('%s\n' % ' '.join(map(str, action)))
@@ -480,17 +490,49 @@ class NNController:
     def action_net_main(self, state):
         return self.action_net.q_from_sa(state.reshape((1,-1)))[0]
 
-    def evaluate_simbicon(self, t):
-        actual = [i[1] for i in t]
-        pred = [self.current_net.get_best_a_discrete(i[0]) for i in t]
+    def correct_rate(self, pred, actual):
         count = 0
         for x,y in zip(pred, actual):
             if x == y:
                 count += 1
-        return np.array(pred), np.array(actual), count/float(len(pred))
+        return count/float(len(pred))
+
+    def evaluate_simbicon(self, t):
+        actual = [i[1] for i in t]
+        pred = [self.current_net.get_best_a_discrete(i[0]) for i in t]
+        mid = len(pred)/2
+        print 'first half', self.correct_rate(pred[:mid], actual[:mid])
+        print 'second half', self.correct_rate(pred[mid:], actual[mid:])
+        return np.array(pred), np.array(actual), self.correct_rate(pred, actual)
 
     def standardize_state(self, s):
         return (s - self.s_mean) / self.s_std
+
+    def unstandardize_state(self, s):
+        return s * self.s_std + self.s_mean
+
+    def standardize_transition(self, t):
+        t_new = list(t)
+        t_new[0] = self.standardize_state(t[0])
+        t_new[-1] = self.standardize_state(t[-1])
+        return t_new
+
+    def unstandardize_transition(self, t):
+        t_new = list(t)
+        t_new[0] = self.unstandardize_state(t[0])
+        t_new[-1] = self.unstandardize_state(t[-1])
+        return t_new
+
+    def change_rewards_unstandardized(self, t):
+        t_new = t[:]
+        for i in t_new:
+            i[2] = matlab_reward(i[-1])
+        return t_new
+
+    def change_rewards_standardized(self, t):
+        t_unstandardized = [self.unstandardize_transition(i) for i in t]
+        new_unstandardized = self.change_rewards_unstandardized(t_unstandardized)
+        return [self.standardize_transition(i) for i in new_unstandardized]
 
     def set_standardizer(self, s):
         self.s_std = np.std(s, 0)
@@ -501,7 +543,9 @@ class NNController:
         if self.time_step % 10 == 0:
             self.profiler.toc('test')
             self.profiler.tic('test')
-            print 'iter', self.time_step, 'train_t', self.train_t, 'sim_t', self.sim_t, \
+            print 'iter', self.time_step, 'sim_num', self.sim_num, \
+                    'num transitions', len(self.transitions.container), \
+                    'train_t', self.train_t, 'sim_t', self.sim_t, \
                     'epsilon', self.epsilon, 'times_trained', self.times_trained, \
                     'net_update_count', self.net_update_count, \
                     'learn_rate', self.current_net.get_learn_rate()
@@ -558,21 +602,33 @@ class NNController:
 if __name__ == '__main__':
 
     c = NNController(conf='simbicon.conf')
-    #file_nums = [37162113, 23784567, 50082242, 15798237, 7391689, 41484959, 33333319, 59125168, 24751219, 53399322, 22164425, 50931795, 20485990, 49859198]
-    file_nums = [56385034, 9381058]
+    #file_nums = [56385034, 9381058]
+    file_nums = [48519536, 37908959]
     files = ['../KneedCompassGait/outputs/%d.out' % i for i in file_nums]
     t_orig = c.load_simbicon_transitions(files)
     s = np.array([i[0] for i in t_orig])
     c.set_standardizer(s)
-    t = [(c.standardize_state(i[0]), i[1], i[2], c.standardize_state(i[3])) for i in t_orig]
+
+    file_nums = [3617294, 52948670]
+    files = ['../KneedCompassGait/outputs/%d.out' % i for i in file_nums]
+    t_orig = c.load_simbicon_transitions(files)
+    t = [c.standardize_transition(i) for i in t_orig]
+    #t = c.change_rewards_standardized(t)
+
+    #rs = [i[2] for i in ref_t_orig]
+    #rs2 = [matlab_reward(i[-1]) for i in ref_t_orig]
+    #diff = [x-y for x,y in zip(rs, rs2)]
+    #print max(diff), min(diff)
+
+    #c.transitions.container = []
+    #c.transitions.container = c.all_ref_transitions[:]
+    #c.transitions.container.extend(t)
+    #c.transitions.container = c.change_rewards_standardized(c.transitions.container)
+    #c.run_no_matlab(files, t)
+
     s = np.array([i[0] for i in t])
     qs = c.current_net.q_from_s_discrete(s)
-    #c.transitions.container = c.standardize_state()
 
-    #c.run_no_matlab(files, t)
-    #pred, actual, rate = c.evaluate_simbicon(t)
-
-    c.run_matlab('RL')
-    #c.run_certainty_train()
-    #c.run_action_train()
-    #self.mse_freqec.run_sas_train()
+    pred, actual, rate = c.evaluate_simbicon(t)
+    print 'correct rate', rate
+    #c.run_matlab('RL')

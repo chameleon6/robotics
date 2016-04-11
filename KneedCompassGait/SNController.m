@@ -66,6 +66,20 @@ classdef SNController < DrakeSystem
       x0 = [2; 0];
     end
 
+    function new_x = reflect_state(obj, x)
+      new_x = x;
+      new_x(3) = x(3) + x(7); %base pitch
+      new_x(7) = -x(7); %hip
+      new_x(4) = x(4) - x(7);
+      new_x(13) = -x(13);
+      new_x(16) = -x(16);
+      new_x(5:6) = x(8:9);
+      new_x(8:9) = x(5:6);
+      new_x(14:15) = x(17:18);
+      new_x(17:18) = x(14:15);
+
+    end
+
     function [h, rel_x] = foot_coords(obj, base_z, hip_angle, knee_angle)
       h = base_z - 0.5*(cos(hip_angle) + cos(hip_angle + knee_angle));
       rel_x = -0.5*(sin(hip_angle) + sin(hip_angle + knee_angle));
@@ -255,6 +269,8 @@ classdef SNController < DrakeSystem
     end
 
     function u = output(obj,t,y,x)
+      u = zeros(6,1);
+      return
 
       % if mod(int16(t*100),5) == 0
       %   t
@@ -269,7 +285,10 @@ classdef SNController < DrakeSystem
       %right_foot = obj.right_foot_height(x)
 
       global sim_fail_time
+      global current_target_state
+
       if t - sim_fail_time > 0.0 | t == 0
+        current_target_state = -1;
         u = zeros(6,1);
         return
       end
@@ -291,10 +310,9 @@ classdef SNController < DrakeSystem
         end
       else
 
-        global current_target_state
         num_dts = t/obj.output_dt;
 
-        if abs(num_dts - round(num_dts)) < 0.00001
+        if abs(num_dts - round(num_dts)) < 0.00001 | current_target_state == -1
           state_ind = -1;
           if obj.use_net == 0
             state_ind = y(1);

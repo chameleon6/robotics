@@ -631,4 +631,4 @@ if __name__ == '__main__':
 
     pred, actual, rate = c.evaluate_simbicon(t)
     print 'correct rate', rate
-    #c.run_matlab('RL')
+    c.run_matlab('RL')

@@ -39,11 +39,19 @@ classdef SNController < DrakeSystem
       %   [torso_lean; max_hip_angle; 0; 0] % left straight in front
       % };
 
+      %state_targets = {
+      %  [leg_cross + torso_lean; leg_cross; max_knee_angle; straight_knee; bend_ankle; bend_ankle], % left bend
+      %  [-max_hip_angle + torso_lean; -max_hip_angle; straight_knee; straight_knee; kick_ankle; kick_ankle], % left kick back
+      %  [torso_lean; -leg_cross; straight_knee; max_knee_angle; bend_ankle; bend_ankle], % right bend
+      %  [torso_lean; max_hip_angle; straight_knee; straight_knee; kick_ankle; kick_ankle] % right kick back
+      %};
+
+      % left leg, left knee, left ankle, right leg, right knee, right ankle
       state_targets = {
-        [leg_cross + torso_lean; leg_cross; max_knee_angle; straight_knee; bend_ankle; bend_ankle], % left bend
-        [-max_hip_angle + torso_lean; -max_hip_angle; straight_knee; straight_knee; kick_ankle; kick_ankle], % left kick back
-        [torso_lean; -leg_cross; straight_knee; max_knee_angle; bend_ankle; bend_ankle], % right bend
-        [torso_lean; max_hip_angle; straight_knee; straight_knee; kick_ankle; kick_ankle] % right kick back
+        [-leg_cross/2 - torso_lean; max_knee_angle; bend_ankle; leg_cross/2 - torso_lean; straight_knee; bend_ankle], % left bend
+        [max_hip_angle/2 - torso_lean; straight_knee; kick_ankle; -max_hip_angle/2 - torso_lean; straight_knee; kick_ankle], % left kick back
+        [leg_cross/2 - torso_lean; straight_knee; bend_ankle; -leg_cross/2 - torso_lean; max_knee_angle; bend_ankle], % right bend
+        [-max_hip_angle/2 - torso_lean; straight_knee; bend_ankle; max_hip_angle/2 - torso_lean; straight_knee; bend_ankle], % right kick back
       };
 
       obj = obj@DrakeSystem(0,2,18,6,true,false);
@@ -89,8 +97,9 @@ classdef SNController < DrakeSystem
       base_z = x(2);
       base_relative_pitch = x(3);
       left_knee_pin = x(5);
+      left_upper_leg_pin = x(4);
 
-      [h, rel_x] = obj.foot_coords(base_z, base_relative_pitch, left_knee_pin);
+      [h, rel_x] = obj.foot_coords(base_z, left_upper_leg_pin + base_relative_pitch, left_knee_pin);
     end
 
     function h = left_foot_height(obj, x)
@@ -101,10 +110,10 @@ classdef SNController < DrakeSystem
 
       base_z = x(2);
       base_relative_pitch = x(3);
-      hip_pin = x(7);
+      right_upper_leg_pin = x(7);
       right_knee_pin = x(8);
 
-      [h, rel_x] = obj.foot_coords(base_z, base_relative_pitch+hip_pin, right_knee_pin);
+      [h, rel_x] = obj.foot_coords(base_z, base_relative_pitch + right_upper_leg_pin, right_knee_pin);
     end
 
     function h = right_foot_height(obj, x)
@@ -177,7 +186,7 @@ classdef SNController < DrakeSystem
       %log = [log [(left_x+right_x)/2; x(10)-0.5; c(1)-x(1)]];
       %log = [log x(10)];
 
-      if x(2) > 0.9 & x(2) < 1.05 & x(10) > 0
+      if x(2) > 0.8 & x(2) < 1.05 %& x(10) > 0
         num_x_steps = floor(x(1)/obj.reward_x_step);
         if num_x_steps > last_reward_x_step & left_x * right_x < 0 & x(10) > 0.5
           last_reward_x_step = num_x_steps;
@@ -269,8 +278,6 @@ classdef SNController < DrakeSystem
     end
 
     function u = output(obj,t,y,x)
-      u = zeros(6,1);
-      return
 
       % if mod(int16(t*100),5) == 0
       %   t
@@ -280,9 +287,6 @@ classdef SNController < DrakeSystem
       %     fprintf(1,'%20s = %f\n',coordinates{i},x(i));
       %   end
       % end
-
-      %left_foot = obj.left_foot_height(x)
-      %right_foot = obj.right_foot_height(x)
 
       global sim_fail_time
       global current_target_state
@@ -313,6 +317,9 @@ classdef SNController < DrakeSystem
         num_dts = t/obj.output_dt;
 
         if abs(num_dts - round(num_dts)) < 0.00001 | current_target_state == -1
+          % t
+          % [rh, rx] = obj.right_foot_coords(x)
+          % [lh, lx] = obj.left_foot_coords(x)
           state_ind = -1;
           if obj.use_net == 0
             state_ind = y(1);
@@ -340,12 +347,14 @@ classdef SNController < DrakeSystem
         targets = state_targets{current_target_state};
 
         % torso, hip, left_knee, right_knee, left_ankle, right_ankle
-        joint_inds = [4;7;5;8;6;9];
+        %joint_inds = [4;7;5;8;6;9];
+        joint_inds = [4;5;6;7;8;9];
         joint_vel_inds = 9 + joint_inds;
         actuals = x(joint_inds);
         vels = x(joint_vel_inds);
         p_const = 200;
-        alphas_p = p_const*[0.1; 1; 1; 1; .1; .1];
+        %alphas_p = p_const*[0.1; 1; 1; 1; .1; .1];
+        alphas_p = p_const*[1; 1; 0.1; 1; 1; 0.1];
         alphas_d = 2*sqrt(alphas_p); %d_const*[10; 1; 1; 1; 1; 1];
         u = alphas_p .* (targets - actuals) - alphas_d .* vels;
         % u = u + 3*randn(6,1);

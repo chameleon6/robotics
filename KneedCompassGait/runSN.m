@@ -27,8 +27,7 @@ v = r.constructVisualizer;
 v.axis = [-1.0 5.0 -0.1 2.1];
 
 v.display_dt = .01;
-sim_len = 0.2;
-
+sim_len = 2;
 good_sim_count = 0;
 trajectories = [];
 traj_count = 1;
@@ -53,7 +52,7 @@ for i = 1:1
   %c = SNController(r);
   sys = feedback(r,c);
 
-  x0 = Point(sys.getStateFrame())
+  x0 = Point(sys.getStateFrame());
 
   if mod(i, 2) == 0
     start_state = 3;
@@ -61,29 +60,30 @@ for i = 1:1
     start_state = 1;
   end
 
-  start_state = 1;
-  start_pose = state_targets{start_state} + 0.01 * randn(6,1);
+  start_pose = state_targets{start_state};% + 0.01 * randn(6,1);
   %start_pose = [0.0, 0.25, 0, 0]
 
-  x0.torso_pin = start_pose(1);
-  x0.hip_pin = start_pose(2);
-  x0.left_knee_pin = start_pose(3);
-  x0.right_knee_pin = start_pose(4);
-  x0.left_ankle_pin = start_pose(5);
-  x0.right_ankle_pin = start_pose(6);
-  if start_state == 1
-    x0.base_relative_pitch = -0.5;
-  else
-    x0.base_relative_pitch = 0.1;
-  end
+  %x0.torso_pin = start_pose(1);
+  %x0.hip_pin = start_pose(2);
+  %x0.left_knee_pin = start_pose(3);
+  %x0.right_knee_pin = start_pose(4);
+  %x0.left_ankle_pin = start_pose(5);
+  %x0.right_ankle_pin = start_pose(6);
 
-  x0.base_relative_pitch = -x0.hip_pin;
-  x0.base_z = 1.04;
+  %if start_state == 1
+  %  x0.base_relative_pitch = -0.5;
+  %else
+  %  x0.base_relative_pitch = 0.1;
+  %end
+
+  x0.base_z = 1.4;
   x0.base_zdot = 0.0;
   x0.base_xdot = 0.4;
   x0.x1 = mod(start_state,4) + 1; %start_state
-  x0.base_z = x0.base_z - min(c.left_foot_height(x0), c.right_foot_height(x0)) + 0.01;
   current_target_state = x0.x1;
+  x0(4:9) = start_pose;
+  x0(2) = x0(2) - min(c.left_foot_height(x0), c.right_foot_height(x0)) + 0.01; % base_z
+
 
   %if mod(i,2) == 1
   %  x0.x1 = 3;
@@ -106,8 +106,6 @@ for i = 1:1
   %x0.x1 = 4; %start_state
   %x0.base_z = x0.base_z - min(c.left_foot_height(x0), c.right_foot_height(x0)) + 0.01;
 
-  x0(1:18) = [0.0468806517 1.5 -0.5809296345 0.4501658481 0.3531906305 1.8765274998 0.3031821861 0.2717239432 1.8953324087 0.5239818314 0.1212185094 0.9164383372 -1.7226071413 -0.7483170075 0.1319860563 -0.4583902179 -0.5088036654 -0.8196593879]';
-  x0 = c.reflect_state(x0);
   xtraj = simulate(sys, [0 sim_len], x0);
   runtime = cputime - start_time
 

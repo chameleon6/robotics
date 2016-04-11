@@ -49,7 +49,7 @@
       <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
     </inertial>
   </link>
-  <joint name="torso_mass_weld" type="fixed">
+  <joint name="torso_weld" type="fixed">
     <parent link="torso"/>
     <child link="torso_mass"/>
   </joint>
@@ -280,17 +280,20 @@
 
 
 
-  <joint name="torso_weld" type="fixed">
-    <parent link="hip"/>
-    <child link="torso"/>
-  </joint>
-
-  <joint name="left_upper_leg_pin" type="continuous">
+  <joint name="left_leg_weld" type="fixed">
     <parent link="hip"/>
     <child link="left_upper_leg"/>
-    <axis xyz="0 1 0"/>
   </joint>
-  <joint name="right_upper_leg_pin" type="continuous">
+
+  <joint name="torso_pin" type="continuous">
+    <parent link="hip"/>
+    <child link="torso"/>
+    <axis xyz="0 1 0"/>
+    <!--<limit effort="100" lower="-0.0" upper="0.0"/> -->
+    <limit effort="100"/>
+  </joint>
+
+  <joint name="hip_pin" type="continuous">
     <parent link="hip"/>
     <child link="right_upper_leg"/>
     <axis xyz="0 1 0"/>
@@ -327,27 +330,19 @@
     <limit effort="100" lower="0"/>
   </joint>
 
-  <transmission name="left_upper_leg_trans" type="SimpleTransmission">
-    <actuator name="left_upper_leg_torque"/>
-    <joint name="left_upper_leg_pin"/>
+  <transmission name="torso_trans" type="SimpleTransmission">
+    <actuator name="torso_torque"/>
+    <joint name="torso_pin"/>
     <mechanicalReduction>1</mechanicalReduction>
   </transmission>
-
+  <transmission name="hip_trans" type="SimpleTransmission">
+    <actuator name="hip_torque"/>
+    <joint name="hip_pin"/>
+    <mechanicalReduction>1</mechanicalReduction>
+  </transmission>
   <transmission name="left_knee_trans" type="SimpleTransmission">
     <actuator name="left_knee_torque"/>
     <joint name="left_knee_pin"/>
-    <mechanicalReduction>1</mechanicalReduction>
-  </transmission>
-
-  <transmission name="left_ankle_trans" type="SimpleTransmission">
-    <actuator name="left_ankle_torque"/>
-    <joint name="left_ankle_pin"/>
-    <mechanicalReduction>1</mechanicalReduction>
-  </transmission>
-
-  <transmission name="right_upper_leg_trans" type="SimpleTransmission">
-    <actuator name="right_upper_leg_torque"/>
-    <joint name="right_upper_leg_pin"/>
     <mechanicalReduction>1</mechanicalReduction>
   </transmission>
   <transmission name="right_knee_trans" type="SimpleTransmission">
@@ -356,6 +351,11 @@
     <mechanicalReduction>1</mechanicalReduction>
   </transmission>
 
+  <transmission name="left_ankle_trans" type="SimpleTransmission">
+    <actuator name="left_ankle_torque"/>
+    <joint name="left_ankle_pin"/>
+    <mechanicalReduction>1</mechanicalReduction>
+  </transmission>
 
   <transmission name="right_ankle_trans" type="SimpleTransmission">
     <actuator name="right_ankle_torque"/>

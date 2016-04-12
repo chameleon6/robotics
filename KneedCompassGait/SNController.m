@@ -51,7 +51,7 @@ classdef SNController < DrakeSystem
         [-leg_cross/2 - torso_lean; max_knee_angle; bend_ankle; leg_cross/2 - torso_lean; straight_knee; bend_ankle], % left bend
         [max_hip_angle/2 - torso_lean; straight_knee; kick_ankle; -max_hip_angle/2 - torso_lean; straight_knee; kick_ankle], % left kick back
         [leg_cross/2 - torso_lean; straight_knee; bend_ankle; -leg_cross/2 - torso_lean; max_knee_angle; bend_ankle], % right bend
-        [-max_hip_angle/2 - torso_lean; straight_knee; bend_ankle; max_hip_angle/2 - torso_lean; straight_knee; bend_ankle], % right kick back
+        [-max_hip_angle/2 - torso_lean; straight_knee; kick_ankle; max_hip_angle/2 - torso_lean; straight_knee; kick_ankle], % right kick back
       };
 
       obj = obj@DrakeSystem(0,2,18,6,true,false);
@@ -70,21 +70,33 @@ classdef SNController < DrakeSystem
       obj.output_dt = output_dt;
     end
 
+    function x = state_to_x(obj, ind)
+      global state_targets;
+      x = zeros(18,1);
+      x(2) = 1.0;
+      x(4:9) = state_targets{ind};
+    end
+
     function x0 = getInitialState(obj)
       x0 = [2; 0];
     end
 
     function new_x = reflect_state(obj, x)
       new_x = x;
-      new_x(3) = x(3) + x(7); %base pitch
-      new_x(7) = -x(7); %hip
-      new_x(4) = x(4) - x(7);
-      new_x(13) = -x(13);
-      new_x(16) = -x(16);
-      new_x(5:6) = x(8:9);
-      new_x(8:9) = x(5:6);
-      new_x(14:15) = x(17:18);
-      new_x(17:18) = x(14:15);
+      new_x(4:6) = x(7:9);
+      new_x(7:9) = x(4:6);
+      new_x(13:15) = x(16:18);
+      new_x(16:18) = x(13:15);
+
+      %new_x(3) = x(3) + x(7); %base pitch
+      %new_x(7) = -x(7); %hip
+      %new_x(4) = x(4) - x(7);
+      %new_x(13) = -x(13);
+      %new_x(16) = -x(16);
+      %new_x(5:6) = x(8:9);
+      %new_x(8:9) = x(5:6);
+      %new_x(14:15) = x(17:18);
+      %new_x(17:18) = x(14:15);
 
     end
 

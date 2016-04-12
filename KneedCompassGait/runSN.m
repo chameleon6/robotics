@@ -27,7 +27,7 @@ v = r.constructVisualizer;
 v.axis = [-1.0 5.0 -0.1 2.1];
 
 v.display_dt = .01;
-sim_len = 2;
+sim_len = 1;
 good_sim_count = 0;
 trajectories = [];
 traj_count = 1;
@@ -79,10 +79,12 @@ for i = 1:1
   x0.base_z = 1.4;
   x0.base_zdot = 0.0;
   x0.base_xdot = 0.4;
-  x0.x1 = mod(start_state,4) + 1; %start_state
+  x0.x1 = 2;
+  %x0.x1 = mod(start_state,4) + 1; %start_state
   current_target_state = x0.x1;
   x0(4:9) = start_pose;
   x0(2) = x0(2) - min(c.left_foot_height(x0), c.right_foot_height(x0)) + 0.01; % base_z
+  %x0 = c.reflect_state(x0)
 
 
   %if mod(i,2) == 1

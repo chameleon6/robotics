@@ -392,6 +392,9 @@ class NNController:
             t.extend([(s[i], a[i], r[i+1], False, s[i+1]) for i in range(len(s)-1)])
         return t
 
+    def reflect_transition(self, t):
+        return (reflect_state(t[0]), (t[1]+2) % 4, t[2], t[3], reflect_state(t[4]))
+
     def run_no_matlab(self, files, t):
         np.random.shuffle(self.transitions.container)
         s = np.array([i[0] for i in self.transitions.container])
@@ -622,15 +625,17 @@ if __name__ == '__main__':
     #diff = [x-y for x,y in zip(rs, rs2)]
     #print max(diff), min(diff)
 
-    c.transitions.container = []
-    c.transitions.container = c.all_ref_transitions[:]
-    c.transitions.container.extend(t)
-    c.transitions.container = c.change_rewards_standardized(c.transitions.container)
-    c.run_no_matlab(files, t)
+    #c.transitions.container = []
+    #c.transitions.container = c.all_ref_transitions[:]
+    #c.transitions.container.extend(t)
+    #c.transitions.container = c.change_rewards_standardized(c.transitions.container)
+    #reflected_transitions = [c.reflect_transition(i) for i in c.transitions.container]
+    ##c.transitions.container.extend(reflected_transitions)
+    #c.run_no_matlab(files, t)
 
     s = np.array([i[0] for i in t])
     qs = c.current_net.q_from_s_discrete(s)
 
     pred, actual, rate = c.evaluate_simbicon(t)
     print 'correct rate', rate
-    #c.run_matlab('RL')
+    c.run_matlab('RL')

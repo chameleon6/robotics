@@ -198,7 +198,7 @@ classdef SNController < DrakeSystem
       %log = [log [(left_x+right_x)/2; x(10)-0.5; c(1)-x(1)]];
       %log = [log x(10)];
 
-      if x(2) > 0.8 & x(2) < 1.05 %& x(10) > 0
+      if x(2) > 0.8 & x(2) < 1.05 & x(10) > 0
         num_x_steps = floor(x(1)/obj.reward_x_step);
         if num_x_steps > last_reward_x_step & left_x * right_x < 0 & x(10) > 0.5
           last_reward_x_step = num_x_steps;

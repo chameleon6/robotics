@@ -17,18 +17,19 @@ def left_foot_coords(x):
     base_z = x[2-m_ind_offset]
     base_relative_pitch = x[3-m_ind_offset]
     left_knee_pin = x[5-m_ind_offset]
+    left_upper_leg_pin = x[4-m_ind_offset]
 
-    h, rel_x = foot_coords(base_z, base_relative_pitch, left_knee_pin)
+    h, rel_x = foot_coords(base_z, left_upper_leg_pin + base_relative_pitch, left_knee_pin)
     return h, rel_x
 
 def right_foot_coords(x):
 
     base_z = x[2-m_ind_offset]
     base_relative_pitch = x[3-m_ind_offset]
-    hip_pin = x[7-m_ind_offset]
+    right_upper_leg_pin = x[7-m_ind_offset]
     right_knee_pin = x[8-m_ind_offset]
 
-    h, rel_x = foot_coords(base_z, base_relative_pitch+hip_pin, right_knee_pin)
+    h, rel_x = foot_coords(base_z, base_relative_pitch + right_upper_leg_pin, right_knee_pin)
     return h, rel_x
 
 def matlab_reward(x):
@@ -57,3 +58,11 @@ def matlab_reward(x):
         return r
     else:
         return 0.0
+
+def reflect_state(x):
+    new_x = np.copy(x)
+    new_x[4-m_ind_offset:7-m_ind_offset] = x[7-m_ind_offset:10-m_ind_offset]
+    new_x[7-m_ind_offset:10-m_ind_offset] = x[4-m_ind_offset:7-m_ind_offset]
+    new_x[13-m_ind_offset:16-m_ind_offset] = x[16-m_ind_offset:19-m_ind_offset]
+    new_x[16-m_ind_offset:19-m_ind_offset] = x[13-m_ind_offset:16-m_ind_offset]
+    return new_x[:]

@@ -79,6 +79,8 @@ class NNController:
         self.rmse_rel_hist2 = []
         self.learn_rate_hist = []
         self.certainty_hist = []
+        self.correct_rate_hist = []
+        self.q_mean_hist = []
 
         self.action_counts = np.array([1,1,1,1.])
 
@@ -396,10 +398,13 @@ class NNController:
 
         for i in range(20000):
             if i % 100 == 0:
-                print self.current_net.q_from_s_discrete(s[:20])
+                qs = self.current_net.q_from_s_discrete(s)
+                print qs[:20]
                 print 'iteration', i
                 rate = self.evaluate_simbicon(t)[2]
                 print 'correct_rate', rate
+                self.q_mean_hist.append(np.mean(qs))
+                self.correct_rate_hist.append(rate)
                 if rate > 0.9:
                     print 'good rate'
                     break
@@ -603,15 +608,12 @@ if __name__ == '__main__':
 
     c = NNController(conf='simbicon.conf')
     #file_nums = [56385034, 9381058]
-    file_nums = [48519536, 37908959]
+    #file_nums = [48519536, 37908959]
+    file_nums = [52211431, 41983419]
     files = ['../KneedCompassGait/outputs/%d.out' % i for i in file_nums]
     t_orig = c.load_simbicon_transitions(files)
     s = np.array([i[0] for i in t_orig])
     c.set_standardizer(s)
-
-    file_nums = [3617294, 52948670]
-    files = ['../KneedCompassGait/outputs/%d.out' % i for i in file_nums]
-    t_orig = c.load_simbicon_transitions(files)
     t = [c.standardize_transition(i) for i in t_orig]
     #t = c.change_rewards_standardized(t)
 
@@ -620,15 +622,15 @@ if __name__ == '__main__':
     #diff = [x-y for x,y in zip(rs, rs2)]
     #print max(diff), min(diff)
 
-    #c.transitions.container = []
-    #c.transitions.container = c.all_ref_transitions[:]
-    #c.transitions.container.extend(t)
-    #c.transitions.container = c.change_rewards_standardized(c.transitions.container)
-    #c.run_no_matlab(files, t)
+    c.transitions.container = []
+    c.transitions.container = c.all_ref_transitions[:]
+    c.transitions.container.extend(t)
+    c.transitions.container = c.change_rewards_standardized(c.transitions.container)
+    c.run_no_matlab(files, t)
 
     s = np.array([i[0] for i in t])
     qs = c.current_net.q_from_s_discrete(s)
 
     pred, actual, rate = c.evaluate_simbicon(t)
     print 'correct rate', rate
-    c.run_matlab('RL')
+    #c.run_matlab('RL')

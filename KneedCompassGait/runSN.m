@@ -27,7 +27,7 @@ v = r.constructVisualizer;
 v.axis = [-1.0 5.0 -0.1 2.1];
 
 v.display_dt = .01;
-sim_len = 1;
+sim_len = 0.01;
 good_sim_count = 0;
 trajectories = [];
 traj_count = 1;
@@ -79,8 +79,7 @@ for i = 1:1
   x0.base_z = 1.4;
   x0.base_zdot = 0.0;
   x0.base_xdot = 0.4;
-  x0.x1 = 2;
-  %x0.x1 = mod(start_state,4) + 1; %start_state
+  x0.x1 = mod(start_state,4) + 1; %start_state
   current_target_state = x0.x1;
   x0(4:9) = start_pose;
   x0(2) = x0(2) - min(c.left_foot_height(x0), c.right_foot_height(x0)) + 0.01; % base_z
@@ -127,7 +126,7 @@ for i = 1:1
   end
 
   p_opts = struct('slider', true);
-  v.playback(xtraj, p_opts);
+  %v.playback(xtraj, p_opts);
   if sim_fail_time > 2.0
     good_traj_inds = [good_traj_inds i];
   end
@@ -144,3 +143,10 @@ end
 
 fclose(good_out_file);
 fclose(all_out_file);
+
+% x = [-1.792  1.003 -1.492  1.879  1.108  1.517 -1.103  1.112 -1.169 -0.062 -0.093  0.022  0.136 -0.441  0.015  0.152 -0.495 -1.    -1.     0.136 -1.814];
+% x = [0; x']
+% x_new = [-1.792  1.003  1.517 -1.103  1.112 -1.492  1.879  1.108 -1.169 -0.062 -0.093  0.015  0.152 -0.495  0.022  0.136 -0.441 -1.    -1.     0.136 -1.814];
+% x_new = [0; x_new']
+%
+% diff = c.reflect_state(x) - x_new

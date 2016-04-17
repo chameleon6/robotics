@@ -9,10 +9,13 @@ classdef SNController < DrakeSystem
     python_action_file
     output_dt
     reward_x_step
+    n_boxes
+    box_h
+    box_xs
   end
 
   methods
-    function obj = SNController(plant, use_net, model_num, output_dt)
+    function obj = SNController(plant, use_net, model_num, output_dt, box_xs, box_h)
 
       global state_targets;
       torso_lean = 0.1;
@@ -57,6 +60,9 @@ classdef SNController < DrakeSystem
       obj = obj@DrakeSystem(0,2,18,6,true,false);
       % y(3) = last_rewarded x_step
 
+      obj.n_boxes = size(box_xs, 1);
+      obj.box_xs = box_xs;
+      obj.box_h = box_h;
       obj.reward_x_step = 0.2;
       obj.matlab_state_file = strcat(pwd,'/../NN/matlab_state_file.out');
       obj.python_action_file = strcat(pwd,'/../NN/python_action_file.out');
@@ -68,6 +74,20 @@ classdef SNController < DrakeSystem
       obj.out_file = fopen(obj.out_file_name, 'a');
       obj.use_net = use_net;
       obj.output_dt = output_dt;
+    end
+
+    function h = ground_h(obj, x)
+      if obj.box_h < 0
+        h = 0;
+        return
+      end
+
+      for i = 1:obj.n_boxes
+        if x < obj.box_xs(i)
+          h = (obj.n_boxes - i + 1) * obj.box_h;
+          return
+        end
+      end
     end
 
     function x = state_to_x(obj, ind)
@@ -100,6 +120,13 @@ classdef SNController < DrakeSystem
 
     end
 
+    function [h_rel_left, h_rel_right] = base_heights(obj, x)
+      [left_h, left_x] = obj.left_foot_coords(x);
+      [right_h, right_x] = obj.right_foot_coords(x);
+      h_rel_left = x(2) - obj.ground_h(left_x);
+      h_rel_right = x(2) - obj.ground_h(right_x);
+    end
+
     function [h, rel_x] = foot_coords(obj, base_z, hip_angle, knee_angle)
       h = base_z - 0.5*(cos(hip_angle) + cos(hip_angle + knee_angle));
       rel_x = -0.5*(sin(hip_angle) + sin(hip_angle + knee_angle));
@@ -112,6 +139,7 @@ classdef SNController < DrakeSystem
       left_upper_leg_pin = x(4);
 
       [h, rel_x] = obj.foot_coords(base_z, left_upper_leg_pin + base_relative_pitch, left_knee_pin);
+      h = h - obj.ground_h(rel_x);
     end
 
     function h = left_foot_height(obj, x)
@@ -126,6 +154,7 @@ classdef SNController < DrakeSystem
       right_knee_pin = x(8);
 
       [h, rel_x] = obj.foot_coords(base_z, base_relative_pitch + right_upper_leg_pin, right_knee_pin);
+      h = h - obj.ground_h(rel_x);
     end
 
     function h = right_foot_height(obj, x)
@@ -155,6 +184,7 @@ classdef SNController < DrakeSystem
         [right_h, right_x] = obj.right_foot_coords(x);
 
         should_update = false;
+
         if state == 1 || state == 3
           should_update = time_up;
         elseif state == 2
@@ -197,8 +227,11 @@ classdef SNController < DrakeSystem
       px = px(1);
       %log = [log [(left_x+right_x)/2; x(10)-0.5; c(1)-x(1)]];
       %log = [log x(10)];
+      [bhl, bhr] = obj.base_heights(x);
+      max_h = 1.05;
+      min_h = 0.8;
 
-      if x(2) > 0.8 & x(2) < 1.05 & x(10) > 0
+      if ((bhl > min_h & bhl < max_h) | (bhr > min_h & bhr < max_h)) & x(10) > 0
         num_x_steps = floor(x(1)/obj.reward_x_step);
         if num_x_steps > last_reward_x_step & left_x * right_x < 0 & x(10) > 0.5
           last_reward_x_step = num_x_steps;
@@ -219,7 +252,7 @@ classdef SNController < DrakeSystem
       else
         if ~sim_failed
           sim_failed = true;
-          sim_fail_time = t;
+          sim_fail_time = t
           %r = -10;
           r = 0;
           term = 1;

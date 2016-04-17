@@ -9,8 +9,14 @@ start_time = cputime;
 
 options = [];
 options.floating = true;
-options.terrain = RigidBodyFlatTerrain();
-%options.terrain = RigidBodyStepTerrain([0.5 0 0.25 1000 0.05]);
+
+%box_xs = [-1];
+%box_h = -1;
+%options.terrain = RigidBodyFlatTerrain();
+
+box_xs = [-1; 0.2; 0.4; 0.6; 0.8; 1];
+[boxes, box_h] = make_boxes(box_xs);
+options.terrain = RigidBodyStepTerrain(boxes);
 
 options.twoD = true;
 options.view = 'right';
@@ -27,14 +33,14 @@ v = r.constructVisualizer;
 v.axis = [-1.0 5.0 -0.1 2.1];
 
 v.display_dt = .01;
-sim_len = 3;
+sim_len = 1;
 good_sim_count = 0;
 trajectories = [];
 traj_count = 1;
 model_nums = [];
 good_traj_inds = [];
 
-for i = 1:2
+for i = 1:1
 
   fprintf('sim %d\n', i);
   log = zeros(4,0);
@@ -47,7 +53,7 @@ for i = 1:2
 
   clk = clock;
   model_num = round(clk(6)*1000000);
-  c = SNController(r, 2, model_num, 0.1);
+  c = SNController(r, 0, model_num, 0.1, box_xs, box_h);
   c = setSampleTime(c, [0.001;0]);
   %c = SNController(r);
   sys = feedback(r,c);
@@ -60,7 +66,7 @@ for i = 1:2
     start_state = 1;
   end
 
-  start_pose = state_targets{start_state};% + 0.01 * randn(6,1);
+  start_pose = state_targets{start_state} + 0.01 * randn(6,1);
   %start_pose = [0.0, 0.25, 0, 0]
 
   %x0.torso_pin = start_pose(1);
@@ -76,7 +82,7 @@ for i = 1:2
   %  x0.base_relative_pitch = 0.1;
   %end
 
-  x0.base_z = 1.4;
+  x0.base_z = 1.1;
   x0.base_zdot = 0.0;
   x0.base_xdot = 0.4;
   x0.x1 = mod(start_state,4) + 1; %start_state

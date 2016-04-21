@@ -10,19 +10,18 @@ start_time = cputime;
 options = [];
 options.floating = true;
 
-%box_xs = [-1];
-%box_h = -1;
-%options.terrain = RigidBodyFlatTerrain();
+% box_xs = [-1];
+% box_h = -1;
+% options.terrain = RigidBodyFlatTerrain();
 
-box_xs = [-1; 0.2; 0.4; 0.6; 0.8; 1];
+box_xs = [-1; 0.4; 0.8; 1.2; 1.6; 2];
 [boxes, box_h] = make_boxes(box_xs);
-options.terrain = RigidBodyStepTerrain(boxes);
+% options.terrain = RigidBodyStepTerrain(boxes);
 
 options.twoD = true;
 options.view = 'right';
-%m = PlanarRigidBodyManipulator('KneedCompassGait.urdf', options);
-%r = TimeSteppingRigidBodyManipulator(m,.001);
 r = TimeSteppingRigidBodyManipulator('KneedCompassGait.urdf', 0.001, options);
+r = r.addRobotFromURDF('box.urdf');
 good_out_file = fopen('outputs/good_simbicon_files.out', 'a');
 all_out_file = fopen('outputs/all_simbicon_files.out', 'a');
 
@@ -33,7 +32,7 @@ v = r.constructVisualizer;
 v.axis = [-1.0 5.0 -0.1 2.1];
 
 v.display_dt = .01;
-sim_len = 1;
+sim_len = 2;
 good_sim_count = 0;
 trajectories = [];
 traj_count = 1;
@@ -82,12 +81,13 @@ for i = 1:1
   %  x0.base_relative_pitch = 0.1;
   %end
 
-  x0.base_z = 1.1;
+  x0.base_z = 1.9;
   x0.base_zdot = 0.0;
   x0.base_xdot = 0.4;
   x0.x1 = mod(start_state,4) + 1; %start_state
   current_target_state = x0.x1;
   x0(4:9) = start_pose;
+  x0(1) = 0.3;
   x0(2) = x0(2) - min(c.left_foot_height(x0), c.right_foot_height(x0)) + 0.01; % base_z
   %x0 = c.reflect_state(x0)
 

@@ -6,7 +6,7 @@ from utils import *
 
 class ControlNN:
     def __init__(self, conf, load_path=None):
-        tf_random_seed = 32
+        tf_random_seed = None
         nonlinearity = tf.nn.relu
         self.keep_prob_train_val = 1.0
         self.floatX = 'float32'

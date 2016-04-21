@@ -90,6 +90,20 @@ classdef SNController < DrakeSystem
       end
     end
 
+    function x_drop = next_drop(obj, x)
+      if obj.box_h < 0
+        return
+      end
+
+      for i = 1:obj.n_boxes
+        if x < obj.box_xs(i)
+          x_drop = obj.box_xs(i);
+          return
+        end
+      end
+    end
+
+
     function x = state_to_x(obj, ind)
       global state_targets;
       x = zeros(18,1);
@@ -232,22 +246,21 @@ classdef SNController < DrakeSystem
       min_h = 0.8;
 
       if ((bhl > min_h & bhl < max_h) | (bhr > min_h & bhr < max_h)) & x(10) > 0
-        num_x_steps = floor(x(1)/obj.reward_x_step);
-        if num_x_steps > last_reward_x_step & left_x * right_x < 0 & x(10) > 0.5
-          last_reward_x_step = num_x_steps;
-          t
-          r = 1
-          x
+        % num_x_steps = floor(x(1)/obj.reward_x_step);
+        % if num_x_steps > last_reward_x_step & left_x * right_x < 0 & x(10) > 0.5
+        %   last_reward_x_step = num_x_steps;
+        %   t
+        %   r = 1
+        %   x
+        % else
+        %   r = 0;
+        % end
+
+        if left_x * right_x < 0
+          r = 1;
         else
           r = 0;
         end
-
-        %r = -(c(1) - (left_x + right_x)/2)^2;
-
-        %r1 = -(x(10)-0.5)^2
-        %r2 = -(left_x+right_x)^2
-        %r = r1+r2
-
         term = 0;
       else
         if ~sim_failed
@@ -260,17 +273,24 @@ classdef SNController < DrakeSystem
       end
     end
 
-    function x_new = transform_state(obj, x)
+    function x_new = transform_state(obj, x, t)
       [left_h, left_x] = obj.left_foot_coords(x);
       left_contact = left_h < 0.0005;
       [right_h, right_x] = obj.right_foot_coords(x);
       right_contact = right_h < 0.0005;
-      x_new = [x(2:end); left_contact; right_contact; left_x; right_x];
+      x_new = [x(2:end); left_contact; right_contact; left_x; right_x; left_h; right_h];
+      if obj.box_h > 0
+        lnd = obj.next_drop(left_x + x(1)) - (left_x + x(1));
+        rnd = obj.next_drop(right_x + x(1)) - (right_x + x(1));
+        cnd = obj.next_drop(x(1)) - x(1);
+        t
+        x_new = [x_new; lnd; rnd; cnd]
+      end
     end
 
     function write_state(obj,x,t)
 
-      x_new = obj.transform_state(x);
+      x_new = obj.transform_state(x, t);
       f = fopen(obj.matlab_state_file, 'w');
       %x_new(1) = mod(x(1), 2*pi);
       [r, term] = obj.reward(x,t);
@@ -292,7 +312,7 @@ classdef SNController < DrakeSystem
       start_time = cputime;
       while true
         while exist(obj.python_action_file, 'file') ~= 2
-          if cputime - start_time > 10
+          if cputime - start_time > 120
             cputime - start_time
             error('timeout')
           end
@@ -371,7 +391,7 @@ classdef SNController < DrakeSystem
             [r, term] = obj.reward(x,t);
             fprintf(obj.out_file, '%f ', r);
             fprintf(obj.out_file, '\n');
-            fprintf(obj.out_file, '%.10f ', obj.transform_state(x));
+            fprintf(obj.out_file, '%.10f ', obj.transform_state(x, t));
             fprintf(obj.out_file, '\n');
             fprintf(obj.out_file, '%d ', state_ind - 1);
             fprintf(obj.out_file, '\n');

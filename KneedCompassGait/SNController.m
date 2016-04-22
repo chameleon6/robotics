@@ -103,6 +103,18 @@ classdef SNController < DrakeSystem
       end
     end
 
+    function state = feedback_adjust_state(obj, ind, x)
+      global state_targets;
+      v = x(10);
+      c = 0.2;
+      state = state_targets{ind};
+      old_state = state;
+      if ind == 1
+        state(1) = state(1) - c*v;
+      elseif ind == 3
+        state(4) = state(4) - c*v;
+      end
+    end
 
     function x = state_to_x(obj, ind)
       global state_targets;
@@ -242,10 +254,10 @@ classdef SNController < DrakeSystem
       %log = [log [(left_x+right_x)/2; x(10)-0.5; c(1)-x(1)]];
       %log = [log x(10)];
       [bhl, bhr] = obj.base_heights(x);
-      max_h = 1.05;
-      min_h = 0.8;
+      max_h = 1.5;
+      min_h = 0.5;
 
-      if ((bhl > min_h & bhl < max_h) | (bhr > min_h & bhr < max_h)) & x(10) > 0
+      if ((bhl > min_h & bhl < max_h) | (bhr > min_h & bhr < max_h)) %& x(10) > 0
         % num_x_steps = floor(x(1)/obj.reward_x_step);
         % if num_x_steps > last_reward_x_step & left_x * right_x < 0 & x(10) > 0.5
         %   last_reward_x_step = num_x_steps;
@@ -284,7 +296,7 @@ classdef SNController < DrakeSystem
         rnd = obj.next_drop(right_x + x(1)) - (right_x + x(1));
         cnd = obj.next_drop(x(1)) - x(1);
         t
-        x_new = [x_new; lnd; rnd; cnd]
+        x_new = [x_new; lnd; rnd; cnd];
       end
     end
 
@@ -408,8 +420,8 @@ classdef SNController < DrakeSystem
         global max_knee_angle;
         global state_targets;
 
-        %torso_lean_rel = torso_lean - x(2);
-        targets = state_targets{current_target_state};
+        %targets = state_targets{current_target_state};
+        targets = obj.feedback_adjust_state(current_target_state, x);
 
         % torso, hip, left_knee, right_knee, left_ankle, right_ankle
         %joint_inds = [4;7;5;8;6;9];

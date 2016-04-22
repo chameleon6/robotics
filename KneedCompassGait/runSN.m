@@ -10,13 +10,14 @@ start_time = cputime;
 options = [];
 options.floating = true;
 
-% box_xs = [-1];
-% box_h = -1;
-% options.terrain = RigidBodyFlatTerrain();
+%box_xs = [-1];
+%box_h = -1;
+%options.terrain = RigidBodyFlatTerrain();
 
-box_xs = [-1; 0.4; 0.8; 1.2; 1.6; 2];
+box_xs = [-1; 0.4; 1.2; 2; 2.8; 3.6];
 [boxes, box_h] = make_boxes(box_xs);
-% options.terrain = RigidBodyStepTerrain(boxes);
+
+%%%options.terrain = RigidBodyStepTerrain(boxes);
 
 options.twoD = true;
 options.view = 'right';
@@ -32,7 +33,7 @@ v = r.constructVisualizer;
 v.axis = [-1.0 5.0 -0.1 2.1];
 
 v.display_dt = .01;
-sim_len = 2;
+sim_len = 2.5;
 good_sim_count = 0;
 trajectories = [];
 traj_count = 1;
@@ -65,7 +66,7 @@ for i = 1:1
     start_state = 1;
   end
 
-  start_pose = state_targets{start_state} + 0.01 * randn(6,1);
+  start_pose = state_targets{start_state};% + 0.01 * randn(6,1);
   %start_pose = [0.0, 0.25, 0, 0]
 
   %x0.torso_pin = start_pose(1);
@@ -83,11 +84,11 @@ for i = 1:1
 
   x0.base_z = 1.9;
   x0.base_zdot = 0.0;
-  x0.base_xdot = 0.4;
+  x0.base_xdot = 0.2;
   x0.x1 = mod(start_state,4) + 1; %start_state
   current_target_state = x0.x1;
   x0(4:9) = start_pose;
-  x0(1) = 0.3;
+  x0(1) = 0;
   x0(2) = x0(2) - min(c.left_foot_height(x0), c.right_foot_height(x0)) + 0.01; % base_z
   %x0 = c.reflect_state(x0)
 

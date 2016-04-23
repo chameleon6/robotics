@@ -1,19 +1,23 @@
 <?xml version="1.0"?>
 <robot xmlns="http://drake.mit.edu"
  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
- xsi:schemaLocation="http://drake.mit.edu ../../../doc/drakeURDF.xsd" name="myfirst">
+  xsi:schemaLocation="http://drake.mit.edu ../../../doc/drakeURDF.xsd" name="myfirst">
+
+    
+
+
   <link name="box1">
     <visual>
       <geometry>
-        <box size="1.4 100 0.30"/>
+        <box size="2.100000 100 0.600000"/>
       </geometry>
-      <origin xyz="-0.3 0 0.15"/>
+      <origin xyz="-0.050000 0 0.200000"/>
     </visual>
     <collision>
       <geometry>
-        <box size="1.4 100 0.30"/>
+        <box size="2.100000 100 0.600000"/>
       </geometry>
-      <origin xyz="-0.3 0 0.15"/>
+      <origin xyz="-0.050000 0 0.200000"/>
     </collision>
     <inertial>
       <mass value="10"/>
@@ -21,19 +25,22 @@
       <origin xyz="0.1 0 0"/>
     </inertial>
   </link>
+    
+    
+
 
   <link name="box2">
     <visual>
       <geometry>
-        <box size="1 100 0.24"/>
+        <box size="1.100000 100 0.500000"/>
       </geometry>
-      <origin xyz="0.7 0 0.12"/>
+      <origin xyz="1.450000 0 0.150000"/>
     </visual>
     <collision>
       <geometry>
-        <box size="1 100 0.24"/>
+        <box size="1.100000 100 0.500000"/>
       </geometry>
-      <origin xyz="0.7 0 0.12"/>
+      <origin xyz="1.450000 0 0.150000"/>
     </collision>
     <inertial>
       <mass value="10"/>
@@ -41,19 +48,22 @@
       <origin xyz="0.1 0 0"/>
     </inertial>
   </link>
+    
+    
+
 
   <link name="box3">
     <visual>
       <geometry>
-        <box size="1 100 0.18"/>
+        <box size="1.100000 100 0.400000"/>
       </geometry>
-      <origin xyz="1.5 0 0.09"/>
+      <origin xyz="2.450000 0 0.100000"/>
     </visual>
     <collision>
       <geometry>
-        <box size="1 100 0.18"/>
+        <box size="1.100000 100 0.400000"/>
       </geometry>
-      <origin xyz="1.5 0 0.09"/>
+      <origin xyz="2.450000 0 0.100000"/>
     </collision>
     <inertial>
       <mass value="10"/>
@@ -61,19 +71,22 @@
       <origin xyz="0.1 0 0"/>
     </inertial>
   </link>
+    
+    
+
 
   <link name="box4">
     <visual>
       <geometry>
-        <box size="1 100 0.12"/>
+        <box size="1.100000 100 0.300000"/>
       </geometry>
-      <origin xyz="2.3 0 0.06"/>
+      <origin xyz="3.450000 0 0.050000"/>
     </visual>
     <collision>
       <geometry>
-        <box size="1 100 0.12"/>
+        <box size="1.100000 100 0.300000"/>
       </geometry>
-      <origin xyz="2.3 0 0.06"/>
+      <origin xyz="3.450000 0 0.050000"/>
     </collision>
     <inertial>
       <mass value="10"/>
@@ -81,19 +94,22 @@
       <origin xyz="0.1 0 0"/>
     </inertial>
   </link>
+    
+    
+
 
   <link name="box5">
     <visual>
       <geometry>
-        <box size="1 100 0.06"/>
+        <box size="1.100000 100 0.200000"/>
       </geometry>
-      <origin xyz="3.1 0 0.03"/>
+      <origin xyz="4.450000 0 0.000000"/>
     </visual>
     <collision>
       <geometry>
-        <box size="1 100 0.06"/>
+        <box size="1.100000 100 0.200000"/>
       </geometry>
-      <origin xyz="3.1 0 0.03"/>
+      <origin xyz="4.450000 0 0.000000"/>
     </collision>
     <inertial>
       <mass value="10"/>
@@ -101,19 +117,19 @@
       <origin xyz="0.1 0 0"/>
     </inertial>
   </link>
-
+    
   <link name="base">
     <visual>
       <geometry>
-        <box size="6 100 0.1"/>
+        <box size="20 100 0.1"/>
       </geometry>
-      <origin xyz="2.0 0 -0.05"/>
+      <origin xyz="0 0 -0.05"/>
     </visual>
     <collision>
       <geometry>
-        <box size="6 100 0.1"/>
+        <box size="20 100 0.1"/>
       </geometry>
-      <origin xyz="2.0 0 -0.05"/>
+      <origin xyz="0 0 -0.05"/>
     </collision>
     <inertial>
       <mass value="10"/>

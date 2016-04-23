@@ -17,44 +17,40 @@ classdef SNController < DrakeSystem
   methods
     function obj = SNController(plant, use_net, model_num, output_dt, box_xs, box_h)
 
-      global state_targets;
-      torso_lean = 0.1;
-      max_hip_angle = 0.7;
-      max_knee_angle = 0.7;
-      leg_cross = 0.6;
-      straight_knee = 0.1;
-      bend_ankle = pi/2 + 0.3;
-      kick_ankle = pi/2 + 0.5;
+      % global state_targets;
+      % torso_lean = 0.1;
+      % max_hip_angle = 0.7;
+      % max_knee_angle = 0.7;
+      % leg_cross = 0.6;
+      % straight_knee = 0.1;
+      % bend_ankle = pi/2 + 0.3;
+      % kick_ankle = pi/2 + 0.5;
 
-      %torso_lean = 0.1;
-      %max_hip_angle = 1.0;
-      %max_knee_angle = 1.0;
-      %leg_cross = 1.0;
-      %straight_knee = 0.1;
-      %bend_ankle = pi/2 + 0.3;
-      %kick_ankle = pi/2 + 0.5;
-
-      % torso, hip, left_knee, right_knee, left_ankle, right_ankle
+      % % left leg, left knee, left ankle, right leg, right knee, right ankle
       % state_targets = {
-      %   [torso_lean; -leg_cross; 0; max_knee_angle], % right bend
-      %   [torso_lean; -max_hip_angle; 0; 0], % right straight in front
-      %   [torso_lean; leg_cross; max_knee_angle; 0], % left bend
-      %   [torso_lean; max_hip_angle; 0; 0] % left straight in front
+      %   [-leg_cross/2 - torso_lean; max_knee_angle; bend_ankle; leg_cross/2 - torso_lean; straight_knee; bend_ankle], % left bend
+      %   [max_hip_angle/2 - torso_lean; straight_knee; kick_ankle; -max_hip_angle/2 - torso_lean; straight_knee; kick_ankle], % left kick back
+      %   [leg_cross/2 - torso_lean; straight_knee; bend_ankle; -leg_cross/2 - torso_lean; max_knee_angle; bend_ankle], % right bend
+      %   [-max_hip_angle/2 - torso_lean; straight_knee; kick_ankle; max_hip_angle/2 - torso_lean; straight_knee; kick_ankle], % right kick back
       % };
 
-      %state_targets = {
-      %  [leg_cross + torso_lean; leg_cross; max_knee_angle; straight_knee; bend_ankle; bend_ankle], % left bend
-      %  [-max_hip_angle + torso_lean; -max_hip_angle; straight_knee; straight_knee; kick_ankle; kick_ankle], % left kick back
-      %  [torso_lean; -leg_cross; straight_knee; max_knee_angle; bend_ankle; bend_ankle], % right bend
-      %  [torso_lean; max_hip_angle; straight_knee; straight_knee; kick_ankle; kick_ankle] % right kick back
-      %};
+      global state_targets;
+      torso_lean = 0.;
+      max_hip_angle = 1.4;
+      max_knee_angle = 0.7;
+      leg_cross = 1.2;
+      straight_knee = 0.1;
+      %bend_ankle = pi/2 + 0.3;
+      %kick_ankle = pi/2 + 0.5;
+      bend_ankle = pi/2 + 0.1;
+      kick_ankle = pi/2;
 
       % left leg, left knee, left ankle, right leg, right knee, right ankle
       state_targets = {
-        [-leg_cross/2 - torso_lean; max_knee_angle; bend_ankle; leg_cross/2 - torso_lean; straight_knee; bend_ankle], % left bend
-        [max_hip_angle/2 - torso_lean; straight_knee; kick_ankle; -max_hip_angle/2 - torso_lean; straight_knee; kick_ankle], % left kick back
-        [leg_cross/2 - torso_lean; straight_knee; bend_ankle; -leg_cross/2 - torso_lean; max_knee_angle; bend_ankle], % right bend
-        [-max_hip_angle/2 - torso_lean; straight_knee; kick_ankle; max_hip_angle/2 - torso_lean; straight_knee; kick_ankle], % right kick back
+        [-leg_cross/2 - torso_lean; max_knee_angle; bend_ankle; 0; straight_knee; bend_ankle], % left bend
+        [max_hip_angle/2 - torso_lean; straight_knee; kick_ankle; 0; straight_knee; kick_ankle], % left kick back
+        [0; straight_knee; bend_ankle; -leg_cross/2 - torso_lean; max_knee_angle; bend_ankle], % right bend
+        [0; straight_knee; kick_ankle; max_hip_angle/2 - torso_lean; straight_knee; kick_ankle], % right kick back
       };
 
       obj = obj@DrakeSystem(0,2,18,6,true,false);
@@ -83,11 +79,13 @@ classdef SNController < DrakeSystem
       end
 
       for i = 1:obj.n_boxes
-        if x < obj.box_xs(i)
+        if x + 0.001 < obj.box_xs(i)
           h = (obj.n_boxes - i + 1) * obj.box_h;
           return
         end
       end
+
+      h = 0;
     end
 
     function x_drop = next_drop(obj, x)
@@ -106,13 +104,19 @@ classdef SNController < DrakeSystem
     function state = feedback_adjust_state(obj, ind, x)
       global state_targets;
       v = x(10);
-      c = 0.2;
+      c_v = 0.2;
+      c_d = 2;
       state = state_targets{ind};
-      old_state = state;
       if ind == 1
-        state(1) = state(1) - c*v;
+        state(1) = state(1) - c_v*v;
       elseif ind == 3
-        state(4) = state(4) - c*v;
+        state(4) = state(4) - c_v*v;
+      elseif ind == 2
+        [right_h, right_x] = obj.right_foot_coords(x);
+        state(1) = state(1) - c_d * right_x;
+      elseif ind == 4
+        [left_h, left_x] = obj.left_foot_coords(x);
+        state(4) = state(4) - c_d * left_x;
       end
     end
 
@@ -165,7 +169,7 @@ classdef SNController < DrakeSystem
       left_upper_leg_pin = x(4);
 
       [h, rel_x] = obj.foot_coords(base_z, left_upper_leg_pin + base_relative_pitch, left_knee_pin);
-      h = h - obj.ground_h(rel_x);
+      h = h - obj.ground_h(rel_x + x(1));
     end
 
     function h = left_foot_height(obj, x)
@@ -180,14 +184,30 @@ classdef SNController < DrakeSystem
       right_knee_pin = x(8);
 
       [h, rel_x] = obj.foot_coords(base_z, base_relative_pitch + right_upper_leg_pin, right_knee_pin);
-      h = h - obj.ground_h(rel_x);
+      h = h - obj.ground_h(rel_x + x(1));
     end
 
     function h = right_foot_height(obj, x)
       [h, ~] = obj.right_foot_coords(x);
     end
 
+    function b = on_box_edge(obj, foot_x, t)
+      b = false;
+      if obj.box_h < 0
+        return
+      end
+      % t
+      % foot_x
 
+      for i = 1:obj.n_boxes
+        if abs(obj.box_xs(i) - foot_x) < 0.01
+          b = true;
+          t
+          foot_x
+          return
+        end
+      end
+    end
 
     function y = update(obj,t,old_y,x)
 
@@ -214,14 +234,21 @@ classdef SNController < DrakeSystem
         if state == 1 || state == 3
           should_update = time_up;
         elseif state == 2
-          should_update = left_h < 0.0005;
+          should_update = (left_h < 0.0005) | (obj.on_box_edge(x(1) + left_x, t));
         else
-          should_update = right_h < 0.0005;
+          should_update = (right_h < 0.0005) | (obj.on_box_edge(x(1) + right_x, t));
         end
 
         if should_update
           t
           state = mod(state+1, 4)
+          left_h
+          right_h
+          left_x
+          right_x
+          left_x + x(1)
+          left_g = obj.ground_h(left_x+x(1))
+          right_g = obj.ground_h(right_x+x(1))
           if state == 0
             state = 4
           end
@@ -295,7 +322,6 @@ classdef SNController < DrakeSystem
         lnd = obj.next_drop(left_x + x(1)) - (left_x + x(1));
         rnd = obj.next_drop(right_x + x(1)) - (right_x + x(1));
         cnd = obj.next_drop(x(1)) - x(1);
-        t
         x_new = [x_new; lnd; rnd; cnd];
       end
     end
@@ -365,6 +391,9 @@ classdef SNController < DrakeSystem
       %   end
       % end
 
+      %u = [0;0;0;0;0;0];
+      %return
+
       global sim_fail_time
       global current_target_state
 
@@ -415,7 +444,6 @@ classdef SNController < DrakeSystem
 
         end
 
-        global torso_lean;
         global max_hip_angle;
         global max_knee_angle;
         global state_targets;
@@ -423,8 +451,7 @@ classdef SNController < DrakeSystem
         %targets = state_targets{current_target_state};
         targets = obj.feedback_adjust_state(current_target_state, x);
 
-        % torso, hip, left_knee, right_knee, left_ankle, right_ankle
-        %joint_inds = [4;7;5;8;6;9];
+        % left leg, left knee, left ankle, right leg, right knee, right ankle
         joint_inds = [4;5;6;7;8;9];
         joint_vel_inds = 9 + joint_inds;
         actuals = x(joint_inds);
@@ -434,8 +461,24 @@ classdef SNController < DrakeSystem
         alphas_p = p_const*[1; 1; 0.1; 1; 1; 0.1];
         alphas_d = 2*sqrt(alphas_p); %d_const*[10; 1; 1; 1; 1; 1];
         u = alphas_p .* (targets - actuals) - alphas_d .* vels;
+
+        torso_target = 0.1;
+        torso_swing_p = p_const;
+        torso_swing_d = 2*sqrt(torso_swing_p);
+        torso_im_torque = torso_swing_p * (torso_target - x(3)) - torso_swing_d * x(12);
+        if current_target_state == 1 | current_target_state == 2
+          stance_ind = 4;
+          kick_ind = 1;
+        else
+          stance_ind = 1;
+          kick_ind = 4;
+        end
+
+        u(stance_ind) = -torso_im_torque - u(kick_ind);
+
         % u = u + 3*randn(6,1);
-        u = min(max(u, -50),50);
+        max_abs_torque = 200;
+        u = min(max(u, -max_abs_torque),max_abs_torque);
       end
 
 

@@ -1,4 +1,5 @@
 cd ~/drake-distro/drake/examples/KneedCompassGait
+clear;
 global sim_fail_time;
 global sim_failed;
 global state_targets;
@@ -10,19 +11,28 @@ start_time = cputime;
 options = [];
 options.floating = true;
 
+%%%
 %box_xs = [-1];
 %box_h = -1;
 %options.terrain = RigidBodyFlatTerrain();
-
-box_xs = [-1; 0.4; 1.2; 2; 2.8; 3.6];
-[boxes, box_h] = make_boxes(box_xs);
+%%%
 
 %%%options.terrain = RigidBodyStepTerrain(boxes);
 
 options.twoD = true;
 options.view = 'right';
 r = TimeSteppingRigidBodyManipulator('KneedCompassGait.urdf', 0.001, options);
-r = r.addRobotFromURDF('box.urdf');
+
+%%%
+box_xs = [-1; 1;2;3;4;5]
+box_h = 0.1;
+arg_str = sprintf('%f ', [box_h; box_xs]);
+command_str = sprintf('python make_box_urdf.py %s', arg_str)
+system(command_str);
+%boxes = make_boxes(box_xs, box_h);
+r = r.addRobotFromURDF('pybox.urdf');
+%%%
+
 good_out_file = fopen('outputs/good_simbicon_files.out', 'a');
 all_out_file = fopen('outputs/all_simbicon_files.out', 'a');
 
@@ -30,10 +40,10 @@ all_out_file = fopen('outputs/all_simbicon_files.out', 'a');
 %qd = zeros(3,1);
 %[H,C,B,dH,dC,dB] = manipulatorDynamics(r,q,qd);
 v = r.constructVisualizer;
-v.axis = [-1.0 5.0 -0.1 2.1];
+v.axis = [-1.0 8.0 -0.1 2.1];
 
 v.display_dt = .01;
-sim_len = 2.5;
+sim_len = 0.01;
 good_sim_count = 0;
 trajectories = [];
 traj_count = 1;
@@ -53,7 +63,7 @@ for i = 1:1
 
   clk = clock;
   model_num = round(clk(6)*1000000);
-  c = SNController(r, 0, model_num, 0.1, box_xs, box_h);
+  c = SNController(r, 0, model_num, 0.01, box_xs, box_h);
   c = setSampleTime(c, [0.001;0]);
   %c = SNController(r);
   sys = feedback(r,c);
@@ -84,13 +94,16 @@ for i = 1:1
 
   x0.base_z = 1.9;
   x0.base_zdot = 0.0;
-  x0.base_xdot = 0.2;
+  x0.base_xdot = 0.5;
   x0.x1 = mod(start_state,4) + 1; %start_state
   current_target_state = x0.x1;
   x0(4:9) = start_pose;
   x0(1) = 0;
-  x0(2) = x0(2) - min(c.left_foot_height(x0), c.right_foot_height(x0)) + 0.01; % base_z
+  x0(2) = x0(2) - min(c.left_foot_height(x0), c.right_foot_height(x0)) + 0.001; % base_z
   %x0 = c.reflect_state(x0)
+  %x0(1:18) = [0.432819; 1.261991; 0.219682; -0.254988; 0.467295; 1.920353; -0.229881; 0.086108; 1.813502; 0.813278; -0.464504; 0.087726; -0.636299; 2.932976; 1.953149; 1.122909; -0.793436; -0.006064];
+  %x0(10) = -5;
+  %x0(1) = 0.5;
 
 
   %if mod(i,2) == 1
@@ -133,7 +146,7 @@ for i = 1:1
   end
 
   p_opts = struct('slider', true);
-  %v.playback(xtraj, p_opts);
+  v.playback(xtraj, p_opts);
   if sim_fail_time > 2.0
     good_traj_inds = [good_traj_inds i];
   end

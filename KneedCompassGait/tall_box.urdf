@@ -5,15 +5,15 @@
   <link name="box1">
     <visual>
       <geometry>
-        <box size="1.4 100 0.30"/>
+        <box size="1.4 100 0.60"/>
       </geometry>
-      <origin xyz="-0.3 0 0.15"/>
+      <origin xyz="-0.3 0 0.3"/>
     </visual>
     <collision>
       <geometry>
-        <box size="1.4 100 0.30"/>
+        <box size="1.4 100 0.60"/>
       </geometry>
-      <origin xyz="-0.3 0 0.15"/>
+      <origin xyz="-0.3 0 0.3"/>
     </collision>
     <inertial>
       <mass value="10"/>
@@ -25,15 +25,15 @@
   <link name="box2">
     <visual>
       <geometry>
-        <box size="1 100 0.24"/>
+        <box size="0.8 100 0.48"/>
       </geometry>
-      <origin xyz="0.7 0 0.12"/>
+      <origin xyz="0.8 0 0.24"/>
     </visual>
     <collision>
       <geometry>
-        <box size="1 100 0.24"/>
+        <box size="0.8 100 0.48"/>
       </geometry>
-      <origin xyz="0.7 0 0.12"/>
+      <origin xyz="0.8 0 0.24"/>
     </collision>
     <inertial>
       <mass value="10"/>
@@ -45,15 +45,15 @@
   <link name="box3">
     <visual>
       <geometry>
-        <box size="1 100 0.18"/>
+        <box size="0.8 100 0.36"/>
       </geometry>
-      <origin xyz="1.5 0 0.09"/>
+      <origin xyz="1.6 0 0.18"/>
     </visual>
     <collision>
       <geometry>
-        <box size="1 100 0.18"/>
+        <box size="0.8 100 0.36"/>
       </geometry>
-      <origin xyz="1.5 0 0.09"/>
+      <origin xyz="1.6 0 0.18"/>
     </collision>
     <inertial>
       <mass value="10"/>
@@ -65,15 +65,15 @@
   <link name="box4">
     <visual>
       <geometry>
-        <box size="1 100 0.12"/>
+        <box size="0.8 100 0.24"/>
       </geometry>
-      <origin xyz="2.3 0 0.06"/>
+      <origin xyz="2.4 0 0.12"/>
     </visual>
     <collision>
       <geometry>
-        <box size="1 100 0.12"/>
+        <box size="0.8 100 0.24"/>
       </geometry>
-      <origin xyz="2.3 0 0.06"/>
+      <origin xyz="2.4 0 0.12"/>
     </collision>
     <inertial>
       <mass value="10"/>
@@ -85,15 +85,15 @@
   <link name="box5">
     <visual>
       <geometry>
-        <box size="1 100 0.06"/>
+        <box size="0.8 100 0.12"/>
       </geometry>
-      <origin xyz="3.1 0 0.03"/>
+      <origin xyz="3.2 0 0.06"/>
     </visual>
     <collision>
       <geometry>
-        <box size="1 100 0.06"/>
+        <box size="0.8 100 0.12"/>
       </geometry>
-      <origin xyz="3.1 0 0.03"/>
+      <origin xyz="3.2 0 0.06"/>
     </collision>
     <inertial>
       <mass value="10"/>

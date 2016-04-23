@@ -1,5 +1,4 @@
-function [boxes, h] = make_boxes(xs)
-  h = 0.06;
+function boxes = make_boxes(xs,h)
   n = size(xs,1);
   boxes = zeros(0,5);
   for i = 1:(n-1)

@@ -5,7 +5,9 @@ global sim_failed;
 global state_targets;
 global current_target_state;
 global last_reward_x_step;
-global log;
+global lowest_ground_so_far;
+global failed_current_ground_h;
+global rewarded_current_ground_h;
 start_time = cputime;
 
 options = [];
@@ -24,10 +26,10 @@ options.view = 'right';
 r = TimeSteppingRigidBodyManipulator('KneedCompassGait.urdf', 0.001, options);
 
 %%%
-box_xs = [-1; 1;2;3;4;5]
-box_h = 0.1;
+box_xs = [-1; 0.3; 0.8; 1.7; 2.5; 3.1; 3.6];
+box_h = 0.06;
 arg_str = sprintf('%f ', [box_h; box_xs]);
-command_str = sprintf('python make_box_urdf.py %s', arg_str)
+command_str = sprintf('python make_box_urdf.py %s', arg_str);
 system(command_str);
 %boxes = make_boxes(box_xs, box_h);
 r = r.addRobotFromURDF('pybox.urdf');
@@ -42,8 +44,8 @@ all_out_file = fopen('outputs/all_simbicon_files.out', 'a');
 v = r.constructVisualizer;
 v.axis = [-1.0 8.0 -0.1 2.1];
 
-v.display_dt = .01;
-sim_len = 0.01;
+v.display_dt = .001;
+sim_len = 3;
 good_sim_count = 0;
 trajectories = [];
 traj_count = 1;
@@ -53,17 +55,19 @@ good_traj_inds = [];
 for i = 1:1
 
   fprintf('sim %d\n', i);
-  log = zeros(4,0);
 
   tic
 
   sim_fail_time = inf;
   sim_failed = false;
+  lowest_ground_so_far = -1;
   last_reward_x_step = 0;
+  failed_current_ground_h = true;
+  rewarded_current_ground_h = true;
 
   clk = clock;
   model_num = round(clk(6)*1000000);
-  c = SNController(r, 0, model_num, 0.01, box_xs, box_h);
+  c = SNController(r, 0, model_num, 0.1, box_xs, box_h);
   c = setSampleTime(c, [0.001;0]);
   %c = SNController(r);
   sys = feedback(r,c);

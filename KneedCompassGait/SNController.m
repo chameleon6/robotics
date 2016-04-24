@@ -153,8 +153,8 @@ classdef SNController < DrakeSystem
     function [h_rel_left, h_rel_right] = base_heights(obj, x)
       [left_h, left_x] = obj.left_foot_coords(x);
       [right_h, right_x] = obj.right_foot_coords(x);
-      h_rel_left = x(2) - obj.ground_h(left_x);
-      h_rel_right = x(2) - obj.ground_h(right_x);
+      h_rel_left = x(2) - obj.ground_h(left_x + x(1));
+      h_rel_right = x(2) - obj.ground_h(right_x + x(1));
     end
 
     function [h, rel_x] = foot_coords(obj, base_z, hip_angle, knee_angle)
@@ -191,19 +191,19 @@ classdef SNController < DrakeSystem
       [h, ~] = obj.right_foot_coords(x);
     end
 
-    function b = on_box_edge(obj, foot_x, t)
+    function b = on_box_edge(obj, foot_x, foot_h, t)
       b = false;
       if obj.box_h < 0
         return
       end
-      % t
-      % foot_x
 
       for i = 1:obj.n_boxes
-        if abs(obj.box_xs(i) - foot_x) < 0.01
+        if abs(obj.box_xs(i) - foot_x) < 0.01 & foot_h < obj.box_h
           b = true;
-          t
-          foot_x
+          %if abs(t*10 - round(t*10)) < 0.0001
+          %  t
+          %  foot_x
+          %end
           return
         end
       end
@@ -231,28 +231,58 @@ classdef SNController < DrakeSystem
 
         should_update = false;
 
+        global lowest_ground_so_far;
+        global failed_current_ground_h;
+        global rewarded_current_ground_h;
+
+        left_ground = obj.ground_h(left_x + x(1));
+        right_ground = obj.ground_h(right_x + x(1));
+        min_ground = min(left_ground, right_ground);
+
+        if lowest_ground_so_far == -1
+          if left_ground ~= right_ground
+            error('did not start on equal ground')
+          end
+          lowest_ground_so_far = left_ground;
+        end
+
+        if min_ground < lowest_ground_so_far
+          failed_current_ground_h = false;
+          rewarded_current_ground_h = false;
+          lowest_ground_so_far = min_ground;
+        end
+
+        left_on_edge = obj.on_box_edge(x(1) + left_x, left_h, t);
+        right_on_edge = obj.on_box_edge(x(1) + right_x, right_h, t);
+        if ((left_on_edge & left_ground == lowest_ground_so_far) | (right_on_edge & right_ground == lowest_ground_so_far)) & failed_current_ground_h == false
+          t
+          lowest_ground_so_far
+          failed_current_ground_h = true
+        end
+
         if state == 1 || state == 3
           should_update = time_up;
         elseif state == 2
-          should_update = (left_h < 0.0005) | (obj.on_box_edge(x(1) + left_x, t));
+          should_update = (left_h < 0.0005) | left_on_edge;
         else
-          should_update = (right_h < 0.0005) | (obj.on_box_edge(x(1) + right_x, t));
+          should_update = (right_h < 0.0005) | right_on_edge;
         end
 
         if should_update
-          t
-          state = mod(state+1, 4)
-          left_h
-          right_h
-          left_x
-          right_x
-          left_x + x(1)
-          left_g = obj.ground_h(left_x+x(1))
-          right_g = obj.ground_h(right_x+x(1))
+          state = mod(state+1, 4);
+          % left_h
+          % right_h
+          % left_x
+          % right_x
+          % left_x + x(1)
+          % left_g = obj.ground_h(left_x+x(1))
+          % right_g = obj.ground_h(right_x+x(1))
           if state == 0
-            state = 4
+            state = 4;
           end
           last_update_time = t;
+          %t
+          %state
         end
 
         y = [state; last_update_time];
@@ -261,18 +291,19 @@ classdef SNController < DrakeSystem
       end
     end
 
-    %function ts = getSampleTime(obj)
-    %  ts = [0.001 0; 0 0];
-    %end
-
     function [r, term] = reward(obj,x,t)
 
       global sim_failed;
       global sim_fail_time;
       global last_reward_x_step;
-      global log;
+      global lowest_ground_so_far;
+      global failed_current_ground_h;
+      global rewarded_current_ground_h;
+
       [left_h, left_x] = obj.left_foot_coords(x);
       [right_h, right_x] = obj.right_foot_coords(x);
+      left_ground = obj.ground_h(left_x + x(1));
+      right_ground = obj.ground_h(right_x + x(1));
 
       [c,J] = obj.p.getCOM(x);
       qd = x(10:end);
@@ -285,21 +316,24 @@ classdef SNController < DrakeSystem
       min_h = 0.5;
 
       if ((bhl > min_h & bhl < max_h) | (bhr > min_h & bhr < max_h)) %& x(10) > 0
-        % num_x_steps = floor(x(1)/obj.reward_x_step);
-        % if num_x_steps > last_reward_x_step & left_x * right_x < 0 & x(10) > 0.5
-        %   last_reward_x_step = num_x_steps;
-        %   t
-        %   r = 1
-        %   x
-        % else
-        %   r = 0;
-        % end
-
-        if left_x * right_x < 0
-          r = 1;
+        %if left_x * right_x < 0
+        %  r = 1;
+        %else
+        %  r = 0;
+        %end
+        epsilon = 0.001;
+        if (left_ground == lowest_ground_so_far & left_h < epsilon) | (right_ground == lowest_ground_so_far & right_h < epsilon)
+          if ~rewarded_current_ground_h & ~ failed_current_ground_h
+            t
+            r = 1
+            rewarded_current_ground_h = true;
+          else
+            r = 0;
+          end
         else
           r = 0;
         end
+
         term = 0;
       else
         if ~sim_failed
@@ -324,6 +358,17 @@ classdef SNController < DrakeSystem
         cnd = obj.next_drop(x(1)) - x(1);
         x_new = [x_new; lnd; rnd; cnd];
       end
+
+      %if abs(round(t*10) - t*10) < 0.00001
+      %  t
+      %  lnd
+      %  rnd
+      %  cnd
+      %  left_h
+      %  right_h
+      %  left_x
+      %  right_x
+      %end
     end
 
     function write_state(obj,x,t)

@@ -3,7 +3,9 @@ classdef SNController < DrakeSystem
   properties
     p
     out_file
+    action_out_file
     out_file_name
+    action_out_file_name
     use_net % 0 = simbicon, 1 = NN action, 2 = NN discrete
     matlab_state_file
     python_action_file
@@ -12,10 +14,11 @@ classdef SNController < DrakeSystem
     n_boxes
     box_h
     box_xs
+    num_box_ft
   end
 
   methods
-    function obj = SNController(plant, use_net, model_num, output_dt, box_xs, box_h)
+    function obj = SNController(plant, use_net, model_num, output_dt, box_xs, box_h, num_box_ft)
 
       % global state_targets;
       % torso_lean = 0.1;
@@ -59,6 +62,7 @@ classdef SNController < DrakeSystem
       obj.n_boxes = size(box_xs, 1);
       obj.box_xs = box_xs;
       obj.box_h = box_h;
+      obj.num_box_ft = num_box_ft;
       obj.reward_x_step = 0.2;
       obj.matlab_state_file = strcat(pwd,'/../NN/matlab_state_file.out');
       obj.python_action_file = strcat(pwd,'/../NN/python_action_file.out');
@@ -67,7 +71,9 @@ classdef SNController < DrakeSystem
       obj = obj.setOutputFrame(plant.getInputFrame);
       c = clock;
       obj.out_file_name = sprintf('outputs/%d.out', model_num);
-      obj.out_file = fopen(obj.out_file_name, 'a');
+      obj.action_out_file_name = sprintf('action_outputs/%d.out', model_num);
+      obj.out_file = fopen(obj.out_file_name, 'w');
+      obj.action_out_file = fopen(obj.action_out_file_name, 'w');
       obj.use_net = use_net;
       obj.output_dt = output_dt;
     end
@@ -87,6 +93,20 @@ classdef SNController < DrakeSystem
 
       h = 0;
     end
+
+    function x_drops = all_next_drops(obj, x)
+      if obj.box_h < 0
+        return
+      end
+
+      for i = 1:obj.n_boxes
+        if x < obj.box_xs(i)
+          x_drops = obj.box_xs(i:end);
+          return
+        end
+      end
+    end
+
 
     function x_drop = next_drop(obj, x)
       if obj.box_h < 0
@@ -211,6 +231,40 @@ classdef SNController < DrakeSystem
 
     function y = update(obj,t,old_y,x)
 
+      [left_h, left_x] = obj.left_foot_coords(x);
+      [right_h, right_x] = obj.right_foot_coords(x);
+
+      should_update = false;
+
+      global lowest_ground_so_far;
+      global failed_current_ground_h;
+      global rewarded_current_ground_h;
+
+      left_ground = obj.ground_h(left_x + x(1));
+      right_ground = obj.ground_h(right_x + x(1));
+      min_ground = min(left_ground, right_ground);
+
+      if lowest_ground_so_far == -1
+        if left_ground ~= right_ground
+          error('did not start on equal ground')
+        end
+        lowest_ground_so_far = left_ground;
+      end
+
+      if min_ground < lowest_ground_so_far
+        failed_current_ground_h = false;
+        rewarded_current_ground_h = false;
+        lowest_ground_so_far = min_ground;
+      end
+
+      left_on_edge = obj.on_box_edge(x(1) + left_x, left_h, t);
+      right_on_edge = obj.on_box_edge(x(1) + right_x, right_h, t);
+      if ((left_on_edge & left_ground == lowest_ground_so_far) | (right_on_edge & right_ground == lowest_ground_so_far)) & failed_current_ground_h == false
+        t
+        lowest_ground_so_far
+        failed_current_ground_h = true
+      end
+
       if obj.use_net == 0
         state = old_y(1);
         last_update_time = old_y(2);
@@ -226,42 +280,9 @@ classdef SNController < DrakeSystem
         %right_h = foot_height(base_relative_pitch+hip_pin, right_knee_pin);
 
         time_up = t - last_update_time > update_interval;
-        [left_h, left_x] = obj.left_foot_coords(x);
-        [right_h, right_x] = obj.right_foot_coords(x);
-
-        should_update = false;
-
-        global lowest_ground_so_far;
-        global failed_current_ground_h;
-        global rewarded_current_ground_h;
-
-        left_ground = obj.ground_h(left_x + x(1));
-        right_ground = obj.ground_h(right_x + x(1));
-        min_ground = min(left_ground, right_ground);
-
-        if lowest_ground_so_far == -1
-          if left_ground ~= right_ground
-            error('did not start on equal ground')
-          end
-          lowest_ground_so_far = left_ground;
-        end
-
-        if min_ground < lowest_ground_so_far
-          failed_current_ground_h = false;
-          rewarded_current_ground_h = false;
-          lowest_ground_so_far = min_ground;
-        end
-
-        left_on_edge = obj.on_box_edge(x(1) + left_x, left_h, t);
-        right_on_edge = obj.on_box_edge(x(1) + right_x, right_h, t);
-        if ((left_on_edge & left_ground == lowest_ground_so_far) | (right_on_edge & right_ground == lowest_ground_so_far)) & failed_current_ground_h == false
-          t
-          lowest_ground_so_far
-          failed_current_ground_h = true
-        end
-
+        max_swing_dist = 0.8;
         if state == 1 || state == 3
-          should_update = time_up;
+          should_update = time_up;% | abs(left_x - right_x) > max_swing_dist;
         elseif state == 2
           should_update = (left_h < 0.0005) | left_on_edge;
         else
@@ -289,6 +310,7 @@ classdef SNController < DrakeSystem
       else
         y = [0;0];
       end
+
     end
 
     function [r, term] = reward(obj,x,t)
@@ -304,6 +326,9 @@ classdef SNController < DrakeSystem
       [right_h, right_x] = obj.right_foot_coords(x);
       left_ground = obj.ground_h(left_x + x(1));
       right_ground = obj.ground_h(right_x + x(1));
+
+      left_on_edge = obj.on_box_edge(x(1) + left_x, left_h, t);
+      right_on_edge = obj.on_box_edge(x(1) + right_x, right_h, t);
 
       [c,J] = obj.p.getCOM(x);
       qd = x(10:end);
@@ -322,16 +347,16 @@ classdef SNController < DrakeSystem
         %  r = 0;
         %end
         epsilon = 0.001;
-        if (left_ground == lowest_ground_so_far & left_h < epsilon) | (right_ground == lowest_ground_so_far & right_h < epsilon)
-          if ~rewarded_current_ground_h & ~ failed_current_ground_h
-            t
-            r = 1
-            rewarded_current_ground_h = true;
-          else
-            r = 0;
-          end
-        else
+        if ((left_ground == lowest_ground_so_far & left_h < epsilon) | (right_ground == lowest_ground_so_far & right_h < epsilon)) & ~rewarded_current_ground_h & ~ failed_current_ground_h & x(10) > 0
+          t
+          r = 10
+          rewarded_current_ground_h = true;
+        elseif left_x * right_x > 0 | x(10) < 0
           r = 0;
+        elseif ~left_on_edge & ~right_on_edge
+          r = 2;
+        else
+          r = 1;
         end
 
         term = 0;
@@ -340,9 +365,9 @@ classdef SNController < DrakeSystem
           sim_failed = true;
           sim_fail_time = t
           %r = -10;
-          r = 0;
-          term = 1;
         end
+        r = 0;
+        term = 1;
       end
     end
 
@@ -351,24 +376,33 @@ classdef SNController < DrakeSystem
       left_contact = left_h < 0.0005;
       [right_h, right_x] = obj.right_foot_coords(x);
       right_contact = right_h < 0.0005;
-      x_new = [x(2:end); left_contact; right_contact; left_x; right_x; left_h; right_h];
+      [h_rel_left, h_rel_right] = obj.base_heights(x);
+      x_new = [x(3:end); h_rel_left; h_rel_right; left_contact; right_contact; left_x; right_x; left_h; right_h];
       if obj.box_h > 0
-        lnd = obj.next_drop(left_x + x(1)) - (left_x + x(1));
-        rnd = obj.next_drop(right_x + x(1)) - (right_x + x(1));
-        cnd = obj.next_drop(x(1)) - x(1);
+        %lnd = obj.next_drop(left_x + x(1)) - (left_x + x(1));
+        %rnd = obj.next_drop(right_x + x(1)) - (right_x + x(1));
+        %cnd = obj.next_drop(x(1)) - x(1);
+        lnd = obj.all_next_drops(left_x + x(1)) - (left_x + x(1));
+        lnd = lnd(1:obj.num_box_ft);
+        rnd = obj.all_next_drops(right_x + x(1)) - (right_x + x(1));
+        rnd = rnd(1:obj.num_box_ft);
+        cnd = obj.all_next_drops(x(1)) - x(1);
+        cnd = cnd(1:obj.num_box_ft);
         x_new = [x_new; lnd; rnd; cnd];
       end
 
-      %if abs(round(t*10) - t*10) < 0.00001
-      %  t
-      %  lnd
-      %  rnd
-      %  cnd
-      %  left_h
-      %  right_h
-      %  left_x
-      %  right_x
-      %end
+      if abs(round(t*10) - t*10) < 0.00001
+        t
+        lnd
+        rnd
+        cnd
+        h_rel_left
+        h_rel_right
+        %left_h
+        %right_h
+        %left_x
+        %right_x
+      end
     end
 
     function write_state(obj,x,t)
@@ -395,7 +429,7 @@ classdef SNController < DrakeSystem
       start_time = cputime;
       while true
         while exist(obj.python_action_file, 'file') ~= 2
-          if cputime - start_time > 120
+          if cputime - start_time > 10
             cputime - start_time
             error('timeout')
           end
@@ -406,7 +440,7 @@ classdef SNController < DrakeSystem
         a = fscanf(f, '%f ');
         fclose(f);
         if isempty(a)
-          fprintf('python incomplete output\n')
+          %fprintf('python incomplete output\n')
           if cputime - start_time > 10
             cputime - start_time
             error('timeout')
@@ -474,18 +508,25 @@ classdef SNController < DrakeSystem
           state_ind = -1;
           if obj.use_net == 0
             state_ind = y(1);
-            [r, term] = obj.reward(x,t);
-            fprintf(obj.out_file, '%f ', r);
-            fprintf(obj.out_file, '\n');
-            fprintf(obj.out_file, '%.10f ', obj.transform_state(x, t));
-            fprintf(obj.out_file, '\n');
-            fprintf(obj.out_file, '%d ', state_ind - 1);
-            fprintf(obj.out_file, '\n');
+            %[r, term] = obj.reward(x,t);
+            %fprintf(obj.out_file, '%f ', r);
+            %fprintf(obj.out_file, '\n');
+            %fprintf(obj.out_file, '%.10f ', obj.transform_state(x, t));
+            %fprintf(obj.out_file, '\n');
+            %fprintf(obj.out_file, '%d ', state_ind - 1);
+            %fprintf(obj.out_file, '\n');
           else %use_net == 2
             obj.write_state(x,t);
             state_ind = round(obj.get_action()) + 1;
           end
           current_target_state = state_ind;
+          [r, term] = obj.reward(x,t);
+          fprintf(obj.out_file, '%f ', r);
+          fprintf(obj.out_file, '\n');
+          fprintf(obj.out_file, '%.10f ', obj.transform_state(x, t));
+          fprintf(obj.out_file, '\n');
+          fprintf(obj.out_file, '%d ', state_ind - 1);
+          fprintf(obj.out_file, '\n');
 
         end
 
@@ -521,18 +562,20 @@ classdef SNController < DrakeSystem
 
         u(stance_ind) = -torso_im_torque - u(kick_ind);
 
-        % u = u + 3*randn(6,1);
-        max_abs_torque = 200;
-        u = min(max(u, -max_abs_torque),max_abs_torque);
+        u = u + 3*randn(6,1);
       end
 
-
-      %u = Point(obj.p.getInputFrame())
-      %[H,C,B] = obj.p.manipulatorDynamics(x(1:2),x(3:4));
-      %l = obj.p.l1+obj.p.l2;
-      %b = .1;
-      %u = C + H*[-obj.p.g*sin(x(1))/l - b*x(3);0];
+      max_abs_torque = 200;
+      u_orig = u;
+      u = min(max(u, -max_abs_torque),max_abs_torque);
+      fprintf(obj.action_out_file, '%.10f ', obj.transform_state(x, t));
+      fprintf(obj.action_out_file, '\n');
+      fprintf(obj.action_out_file, '%.10f ', u);
+      fprintf(obj.action_out_file, '\n');
+      fprintf(obj.action_out_file, '%.10f ', u_orig);
+      fprintf(obj.action_out_file, '\n');
     end
+
   end
 
 end

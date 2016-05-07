@@ -20,6 +20,7 @@ class NNController:
 
         self.matlab_state_file = os.getcwd() + '/matlab_state_file.out'
         self.python_action_file = os.getcwd() + '/python_action_file.out'
+        self.last_no_matlab_net_path = 'last_no_matlab_net.out'
 
         conf = read_conf(conf)
 
@@ -48,6 +49,7 @@ class NNController:
         self.start_epsilon = conf['start_epsilon']
         self.mse_freq = conf['mse_freq']
         self.error_type = conf['error_type']
+        self.RL_train = conf['RL_train']
 
         assert self.start_epsilon >= self.final_epsilon
 
@@ -101,16 +103,17 @@ class NNController:
         if 'transitions_seed' in conf:
             self.transitions.container = pickle.load(open(conf['transitions_seed'], 'rb'))
 
-        '''
         action_conf = conf.copy()
         action_conf['n_a'] = 0
         action_conf['n_q'] = 6
+        action_conf['learn_rate'] = 0.01
         if 'action_net_file' in conf:
             print 'loading action net'
             self.action_net = ControlNN(action_conf, load_path=conf['action_net_file'])
         else:
             self.action_net = ControlNN(action_conf, load_path=None)
 
+        '''
         sas_conf = conf.copy()
         sas_conf['n_s'] = conf['n_s'] + conf['n_a']
         sas_conf['n_q'] = conf['n_s']
@@ -299,13 +302,17 @@ class NNController:
     def run_certainty_train(self):
         self.run_net_train(self.certainty_net, 'certainty_train_data.p')
 
-    def run_action_train(self):
-        self.run_net_train(self.action_net, 'action_train_data.p')
+    def run_action_train(self, xs, us):
+        #self.run_net_train(self.action_net, 'action_train_data.p')
+        xs = self.standardize_state(xs)
+        us = self.standardize_action(us)
+        self.run_net_train(self.action_net, xs, us)
 
-    def run_net_train(self, net, train_data_file):
-        self.profiler.tic('data load')
-        xs, us = pickle.load(open(train_data_file, 'rb'))
-        self.profiler.toc('data load')
+    #def run_net_train(self, net, train_data_file):
+    def run_net_train(self, net, xs, us):
+        #self.profiler.tic('data load')
+        #xs, us = pickle.load(open(train_data_file, 'rb'))
+        #self.profiler.toc('data load')
 
         n_test = len(xs) / 10
 
@@ -318,34 +325,32 @@ class NNController:
         xs, us = xs[n_test:], us[n_test:]
         assert len(xs) == len(us)
 
-        ms_x = mu_std(xs)
-        ms_u = mu_std(us)
+        # ms_x = mu_std(xs)
+        # ms_u = mu_std(us)
 
-        net.set_standardizer(ms_x, ms_u)
+        # net.set_standardizer(ms_x, ms_u)
 
-        xs = standardize(xs, ms_x)
-        x_test = standardize(x_test, ms_x)
-        us = standardize(us, ms_u)
-        u_test = standardize(u_test, ms_u)
+        # xs = standardize(xs, ms_x)
+        # x_test = standardize(x_test, ms_x)
+        # us = standardize(us, ms_u)
+        # u_test = standardize(u_test, ms_u)
 
         n_train = len(xs)
         n_batch = self.n_minibatch
-        print n_train
+        # print n_train
 
-        print ms_x, ms_u
-        for ep in range(30):
+        # print ms_x, ms_u
+        for ep in range(1000):
             self.profiler.tic('epoch')
             print 'epoch', ep
             mse = net.mse_q(x_test, u_test)
             self.mse_hist.append(mse)
             delta = net.learn_delta_q(x_test, u_test)
             #print 'test_us', u_test
-            print 'delta', delta, delta.shape
-            real_mse = np.mean(delta * (ms_u[1]**2))
-            print 'mse', mse, '=', np.mean(delta), 'real mse', real_mse, 'learn_rate', net.get_learn_rate()
+            #print 'delta', delta, delta.shape
+            #real_mse = np.mean(delta * (ms_u[1]**2))
+            print 'mse', mse, '=', np.mean(delta), 'learn_rate', net.get_learn_rate()
             for j in range(n_train/n_batch):
-                if j % 1000 == 0:
-                    print j
                 s = slice(j * n_batch, (j+1)*n_batch, 1)
                 net.train(xs[s], us[s])
             self.profiler.toc('epoch')
@@ -392,6 +397,23 @@ class NNController:
         vis = NetVisualizer(self.current_net)
         vis.q_heat_map()
 
+    def load_action_files(self, files):
+        for fname in files:
+            lines = open(fname, 'r').readlines()
+            lines = map(lambda l: map(float, l.strip().split(' ')), lines)
+            xs = np.array(lines[::3])
+            us = np.array(lines[1::3])
+            us_orig = np.array(lines[2::3])
+            return xs, us, us_orig
+
+    def load_action_files_old(self, files):
+        for fname in files:
+            lines = open(fname, 'r').readlines()
+            lines = map(lambda l: map(float, l.strip().split(' ')), lines)
+            xs = np.array(lines[::2])
+            us = np.array(lines[1::2])
+            return xs, us
+
     def load_simbicon_transitions(self, files):
         t = []
         for fname in files:
@@ -423,19 +445,23 @@ class NNController:
         np.random.shuffle(self.transitions.container)
         s = np.array([i[0] for i in self.transitions.container])
 
-        for i in range(5000):
+        for i in range(1500):
             if i % 100 == 0:
+                self.profiler.tic('qs time')
                 qs = self.current_net.q_from_s_discrete(s)
+                self.profiler.toc('qs time')
                 print qs[:20]
                 print 'iteration', i
+                self.profiler.tic('eval time')
                 preds, actuals, rate = self.evaluate_simbicon(self.good_simbicon_transitions)
+                self.profiler.toc('eval time')
                 print 'actual_dist', count_dist(actuals)
                 print 'pred_dist', count_dist(preds)
                 print 'correct_rate', rate
                 self.q_mean_hist.append(np.mean(qs))
-                if rate > 0.9:
-                    print 'good rate'
-                    break
+                #if rate > 0.93:
+                #    print 'good rate'
+                #    break
 
             self.train_once(i % 100 == 0)
             if self.will_update_old_net_next() or i == 0:
@@ -445,16 +471,24 @@ class NNController:
                 correct_rates.append(rate)
                 self.correct_rate_hist.append(rate)
                 self.mse_hist.append(mse)
-                #if len(mse_hist) > 1 and mse_hist[-1] > mse_hist[-2]:
-                #    print 'mse_hist', mse_hist
-                #    print 'correct_rates', correct_rates
-                #    break
+                print 'mse_hist:', self.mse_hist
+                if len(mse_hist) > 1 and mse_hist[-1] > mse_hist[-2]:
+                    print 'mse_hist', mse_hist
+                    print 'correct_rates', correct_rates
+                    print 'loading best model'
+                    self.current_net.load_model(self.last_no_matlab_net_path)
+                    return
+                self.current_net.save_model(self.last_no_matlab_net_path)
             self.maybe_update_old_net()
         self.profiler.toc('no_matlab')
 
+    def whole_second_frac(self, n):
+        return np.abs(self.sim_t*n - np.round(self.sim_t*n)) < 0.0001
+
     def run_matlab(self, algo):
 
-        print "ready for matlab"
+        print 'ready for matlab'
+
         while True:
             start_time = time.time()
             #self.profiler.tic('wait')
@@ -506,7 +540,7 @@ class NNController:
                 self.current_s_hist = []
                 self.current_t_hist = []
 
-            if reward != 0.0:
+            if reward != 0.0 and self.whole_second_frac(10):
                 print 'received reward', reward, 'at time', self.sim_t #, 'x', state[0]
 
             #certainty = self.certainty_net.q_from_sa(state.reshape((1,-1)))[0][0]
@@ -518,26 +552,29 @@ class NNController:
             os.remove(self.matlab_state_file)
             if algo == 'RL':
                 action = self.RL_train_and_action(state, reward, term)
+                self.action_counts[action] += 1;
+                write_str = '%s\n' % action
             elif algo == 'action_net':
                 action = self.action_net_main(state)
+                write_str = ' '.join(map(str, action)) + '\n'
             else:
                 raise ValueError('Not a valid algo')
 
-            self.action_counts[action] += 1;
 
             #print 'action', action
             f = open(self.python_action_file, 'w')
             #f.write('%s\n' % ' '.join(map(str, action)))
-            f.write('%s\n' % action)
+            f.write(write_str)
             f.close()
 
             if term:
                 print 'sim failed at time', self.sim_t
-                self.initialize_nets()
-                self.run_no_matlab()
+                #self.initialize_nets()
+                #self.run_no_matlab()
 
     def action_net_main(self, state):
-        return self.action_net.q_from_sa(state.reshape((1,-1)))[0]
+        net_out = self.action_net.q_from_sa(state.reshape((1,-1)))[0]
+        return self.unstandardize_action(net_out)
 
     def correct_rate(self, pred, actual):
         count = 0
@@ -553,6 +590,12 @@ class NNController:
         # print 'first half', self.correct_rate(pred[:mid], actual[:mid])
         # print 'second half', self.correct_rate(pred[mid:], actual[mid:])
         return np.array(pred), np.array(actual), self.correct_rate(pred, actual)
+
+    def standardize_action(self, u):
+        return (u - self.u_mean) / self.u_std
+
+    def unstandardize_action(self, u):
+        return u * self.u_std + self.u_mean
 
     def standardize_state(self, s):
         return (s - self.s_mean) / self.s_std
@@ -575,18 +618,27 @@ class NNController:
     def truncate_transitions(self, t):
         return [(i[0][:-4], i[1], i[2], i[3], i[4][:-4]) for i in t]
 
+    def summary_stats(self, t):
+        t = np.array(t)
+        return 'min: %f, max: %f, mean: %f, std: %f' % \
+                (np.min(t), np.max(t), np.mean(t), np.std(t))
+
+    def print_reward_summary(self):
+        print self.summary_stats([x[2] for x in self.transitions.container])
+
     def change_rewards_unstandardized(self, t):
         t_new = t[:]
         old_rewards = []
         new_rewards = []
         for i in t_new:
             old_rewards.append(i[2])
-            #i[2] = 0.
-            i[2] = matlab_reward(i[-1])
+            #i[2] = matlab_reward(i[-1])
+            if i[2] == 10:
+                i[2] = 2
             new_rewards.append(i[2])
 
-        print 'old rewards:', old_rewards
-        print 'new rewards:', new_rewards
+        print 'old rewards', self.summary_stats(old_rewards)
+        print 'new rewards', self.summary_stats(new_rewards)
         return t_new
 
     def change_rewards_standardized(self, t):
@@ -629,18 +681,23 @@ class NNController:
         self.s_std = np.std(s, 0)
         self.s_mean = np.mean(s, 0)
 
+    def set_u_standardizer(self, u):
+        self.u_std = np.std(u, 0)
+        self.u_mean = np.mean(u, 0)
+
     def RL_train_and_action(self, state, reward, term):
 
         #if self.time_step % 10 == 0:
-        self.profiler.toc('RL train and action')
-        self.profiler.tic('RL train and action')
-        print 'iter', self.time_step, 'sim_num', self.sim_num, \
-                'num transitions', len(self.transitions.container), \
-                'transition ratio', self.transition_ratio(), \
-                'train_t', self.train_t, 'sim_t', self.sim_t, \
-                'epsilon', self.epsilon, 'times_trained', self.times_trained, \
-                'net_update_count', self.net_update_count, \
-                'learn_rate', self.current_net.get_learn_rate()
+        #self.profiler.toc('RL train and action')
+        #self.profiler.tic('RL train and action')
+        if self.whole_second_frac(10):
+            print 'iter', self.time_step, 'sim_num', self.sim_num, \
+                    'num transitions', len(self.transitions.container), \
+                    'transition ratio', self.transition_ratio(), \
+                    'train_t', self.train_t, 'sim_t', self.sim_t, \
+                    'epsilon', self.epsilon, 'times_trained', self.times_trained, \
+                    'net_update_count', self.net_update_count, \
+                    'learn_rate', self.current_net.get_learn_rate()
 
         #self.profiler.tic('nn_cycle')
         if self.last_state != None:
@@ -680,8 +737,9 @@ class NNController:
         #         action = -self.max_torque
 
         #self.profiler.tic('nn_cycle1')
-        if self.train_t > 0.0 and self.train_t - self.last_train_time > self.min_train_gap\
-                and len(self.transitions.container) > self.n_minibatch:
+        if self.train_t > 0.0 and self.train_t - self.last_train_time > self.min_train_gap \
+                and len(self.transitions.container) > self.n_minibatch \
+                and self.RL_train:
             #self.train_once(self.times_trained % self.mse_freq == 0)
             for i in range(self.train_per_iter):
                 self.train_once(False)
@@ -692,49 +750,65 @@ class NNController:
         self.last_state = state
         self.last_action = action
         #self.profiler.toc('nn_cycle')
-        print 'action taken:', action
+        if self.whole_second_frac(10):
+            print 'action taken:', action
         return action
 
 if __name__ == '__main__':
 
     c = NNController(conf='simbicon.conf')
     #file_nums = [52211431, 41983419]
-    file_nums = [34403245, 26462535]
+    #file_nums = [34403245, 26462535]
+    f = open('simbicon_info', 'r')
+
+    c.profiler.tic('loading simbicon files')
+    #file_nums = map(int, f.readlines()[-1].strip().split(' '))[:5]
+    #file_nums = [32366732, 14449125, 56594694, 39323664] # simbicon 0.8,1
+    #file_nums = [56071150, 21714576, 16842298, 42847997, 24903202, 50801256, 33378301, 15476319, 23148165, 31165728] # simbicon, 0.4,0.6
+    #file_nums = [10409118, 42863489, 46896633, 36285042, 119317, 35208865] # simb 0.6, 0.8
+    #file_nums = [57956487, 51664368, 3794827, 10925401, 22669808, 23560151, 31258403] # NN 6-8
+
+    #file_nums = [29155381, 20048806, 9022910, 57982100, 50309745, 41684616, 49912394, 43426867, 34486168, 26855010, 36171855] #NN2 6-8, with action
+    #file_nums.extend([5076978, 57623861, 49306452, 55204125, 36616958, 110969, 47891551, 54853789, 1310811, 7504873, 13472364])
+
+    #file_nums = [55692754, 6309521, 14761170, 56020394, 50383334, 59270192, 38319491] # NN both actions
+
+    #file_nums = [35190956, 43266080, 30354380, 16114224, 2346631, 48551106, 18300972, 17168126, 2881742, 38799587, 24944375] # simbicon 0.8 1
+
+    file_nums = [45784265, 31870569, 12752807, 36759048, 36294704, 59918304, 16822284, 59050432, 41944502, 24216744, 27941279] # NN 0.8, 1
+    file_nums_noise = [44471764, 13875631, 321733, 51194756, 23131352, 7530505, 51562342, 38247513, 20316616, 2131893, 23873173] # NN 0.8, 1 + noise
+    file_nums.extend(file_nums_noise)
+
     files = ['../KneedCompassGait/outputs/%d.out' % i for i in file_nums]
+    action_files = ['../KneedCompassGait/action_outputs/%d.out' % i for i in file_nums]
+    c.profiler.toc('loading simbicon files')
+
     t_orig = c.load_simbicon_transitions(files)
+
+    np.random.shuffle(t_orig)
     #t_orig = c.truncate_transitions(t_orig)
     s = np.array([i[0] for i in t_orig])
     c.set_standardizer(s)
     t = [c.standardize_transition(i) for i in t_orig]
 
-    c.good_simbicon_transitions = t[:]
-
-    #rs = [i[2] for i in ref_t_orig]
-    #rs2 = [matlab_reward(i[-1]) for i in ref_t_orig]
-    #diff = [x-y for x,y in zip(rs, rs2)]
-    #print max(diff), min(diff)
+    c.good_simbicon_transitions = t[:2000]
 
     c.transitions.container = []
-    c.transitions.container = c.ref_transitions[:]
+    #c.transitions.container = c.ref_transitions[:]
     #for _ in range(10):
     #c.transitions.container.extend(c.ref_transitions)
 
     c.transitions.container.extend(t)
+    print 'training on %d transitions' % len(c.transitions.container)
+    c.print_reward_summary()
     reflected_transitions = [c.reflect_transition(i) for i in c.transitions.container]
     #c.transitions.container = c.duplicate_positive_rewards(c.transitions.container, 0.1)
     #c.transitions.container.extend(reflected_transitions)
 
-    c.transitions.container = c.change_rewards_standardized(c.transitions.container)
+    #c.transitions.container = c.change_rewards_standardized(c.transitions.container)
 
     final_crs = []
     final_mses = []
-    # for i in range(20):
-    #     c.mse_hist = []
-    #     c.correct_rate_hist = []
-    #     c.initialize_nets()
-    #     c.run_no_matlab()
-    #     final_crs.append(c.correct_rate_hist[-1])
-    #     final_mses.append(c.mse_hist[-1])
 
     s = np.array([i[0] for i in t])
     qs = c.current_net.q_from_s_discrete(s)
@@ -742,4 +816,11 @@ if __name__ == '__main__':
     pred, actual, rate = c.evaluate_simbicon(t)
     print 'correct rate', rate
     #c.run_no_matlab()
-    c.run_matlab('RL')
+    #c.run_matlab('RL')
+
+    action_xs, action_us, action_us_orig = c.load_action_files(action_files)
+    #action_xs, action_us = c.load_action_files_old(action_files)
+    c.set_u_standardizer(action_us)
+    c.run_matlab('action_net')
+
+    c.run_action_train(action_xs, action_us)

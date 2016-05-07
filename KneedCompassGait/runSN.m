@@ -23,40 +23,53 @@ options.floating = true;
 
 options.twoD = true;
 options.view = 'right';
-r = TimeSteppingRigidBodyManipulator('KneedCompassGait.urdf', 0.001, options);
 
-%%%
-box_xs = [-1; 0.3; 0.8; 1.7; 2.5; 3.1; 3.6];
-box_h = 0.06;
-arg_str = sprintf('%f ', [box_h; box_xs]);
-command_str = sprintf('python make_box_urdf.py %s', arg_str);
-system(command_str);
-%boxes = make_boxes(box_xs, box_h);
-r = r.addRobotFromURDF('pybox.urdf');
-%%%
+%good_out_file = fopen('outputs/good_simbicon_files.out', 'a');
+%all_out_file = fopen('outputs/all_simbicon_files.out', 'a');
 
-good_out_file = fopen('outputs/good_simbicon_files.out', 'a');
-all_out_file = fopen('outputs/all_simbicon_files.out', 'a');
-
-%q = zeros(3,1);
-%qd = zeros(3,1);
-%[H,C,B,dH,dC,dB] = manipulatorDynamics(r,q,qd);
-v = r.constructVisualizer;
-v.axis = [-1.0 8.0 -0.1 2.1];
-
+num_box_ft = 3;
 v.display_dt = .001;
-sim_len = 3;
+sim_len = 4;
 good_sim_count = 0;
 trajectories = [];
+visualizers = [];
 traj_count = 1;
 model_nums = [];
 good_traj_inds = [];
+box_lists = [];
+num_failed = 0;
+p_opts = struct('slider', true);
 
 for i = 1:1
 
   fprintf('sim %d\n', i);
+  fprintf('good_traj_count %d\n', size(good_traj_inds, 2));
+  fprintf('num_failed %d\n', num_failed);
 
   tic
+
+  r = TimeSteppingRigidBodyManipulator('KneedCompassGait.urdf', 0.001, options);
+
+  %%
+  %box_xs = [-1; unifrnd(0.3, 0.7)];
+  box_xs = [-1; unifrnd(0.2, 0.4)];
+  num_boxes = 15;
+  for i2 = 1:num_boxes
+    %box_xs = [box_xs; box_xs(end) + unifrnd(0.8, 1)];
+    box_xs = [box_xs; box_xs(end) + unifrnd(0.8, 1)];
+  end
+
+  box_h = 0.06;
+  arg_str = sprintf('%f ', [box_h; box_xs]);
+  command_str = sprintf('python make_box_urdf.py %s', arg_str);
+  system(command_str);
+  box_lists{traj_count} = box_xs;
+  %boxes = make_boxes(box_xs, box_h);
+  r = r.addRobotFromURDF('pybox.urdf');
+  %%%
+
+  v = r.constructVisualizer;
+  v.axis = [-1.0 10.0 -0.1 3.5];
 
   sim_fail_time = inf;
   sim_failed = false;
@@ -66,8 +79,8 @@ for i = 1:1
   rewarded_current_ground_h = true;
 
   clk = clock;
-  model_num = round(clk(6)*1000000);
-  c = SNController(r, 0, model_num, 0.1, box_xs, box_h);
+  model_num = round(clk(6)*1000000)
+  c = SNController(r, 1, model_num, 0.01, box_xs, box_h, num_box_ft);
   c = setSampleTime(c, [0.001;0]);
   %c = SNController(r);
   sys = feedback(r,c);
@@ -131,31 +144,40 @@ for i = 1:1
   %x0.x1 = 4; %start_state
   %x0.base_z = x0.base_z - min(c.left_foot_height(x0), c.right_foot_height(x0)) + 0.01;
 
-  xtraj = simulate(sys, [0 sim_len], x0);
+  success = false;
+  try
+    xtraj = simulate(sys, [0 sim_len], x0);
+    success = true;
+  catch
+    fprintf('error in sim %d', i);
+    num_failed = num_failed + 1;
+  end
+
   runtime = cputime - start_time
 
-  fprintf(all_out_file, '%s\n', c.out_file_name);
-  x_f = xtraj.eval(sim_len);
+  %fprintf(all_out_file, '%s\n', c.out_file_name);
+  %x_f = xtraj.eval(sim_len);
 
-  fprintf(good_out_file, '%s\n', c.out_file_name);
+  %fprintf(good_out_file, '%s\n', c.out_file_name);
   %good_sim_count = good_sim_count + 1
-  trajectories{traj_count} = xtraj;
-  traj_count = traj_count + 1;
-  %end
+  if success
+    trajectories{traj_count} = xtraj;
+    visualizers{traj_count} = v;
+    if ~sim_failed
+      good_traj_inds = [good_traj_inds traj_count];
+    end
+    traj_count = traj_count + 1;
+    model_nums = [model_nums model_num];
+    %v.playback(xtraj, p_opts);
+  end
+
+  if size(good_traj_inds, 2) > 10
+    break
+  end
 
   toc
 
-  if x_f(2) > 0.9
-    model_nums = [model_nums model_num];
-  end
-
-  p_opts = struct('slider', true);
-  v.playback(xtraj, p_opts);
-  if sim_fail_time > 2.0
-    good_traj_inds = [good_traj_inds i];
-  end
-
-
+  fclose(c.out_file)
   % figure
   % hold on;
   % plot(log(1,:), 'r')
@@ -165,12 +187,5 @@ for i = 1:1
 
 end
 
-fclose(good_out_file);
-fclose(all_out_file);
-
-% x = [-1.792  1.003 -1.492  1.879  1.108  1.517 -1.103  1.112 -1.169 -0.062 -0.093  0.022  0.136 -0.441  0.015  0.152 -0.495 -1.    -1.     0.136 -1.814];
-% x = [0; x']
-% x_new = [-1.792  1.003  1.517 -1.103  1.112 -1.492  1.879  1.108 -1.169 -0.062 -0.093  0.015  0.152 -0.495  0.022  0.136 -0.441 -1.    -1.     0.136 -1.814];
-% x_new = [0; x_new']
-%
-% diff = c.reflect_state(x) - x_new
+%fclose(good_out_file);
+%fclose(all_out_file);

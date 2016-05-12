@@ -8,6 +8,10 @@ global last_reward_x_step;
 global lowest_ground_so_far;
 global failed_current_ground_h;
 global rewarded_current_ground_h;
+global ff_torques;
+load('ff.mat')
+ff_torques = zeros(size(ff_torques));
+
 start_time = cputime;
 
 options = [];
@@ -29,7 +33,7 @@ options.view = 'right';
 
 num_box_ft = 3;
 v.display_dt = .001;
-sim_len = 4;
+sim_len = 10;
 good_sim_count = 0;
 trajectories = [];
 visualizers = [];
@@ -51,13 +55,16 @@ for i = 1:1
   r = TimeSteppingRigidBodyManipulator('KneedCompassGait.urdf', 0.001, options);
 
   %%
-  %box_xs = [-1; unifrnd(0.3, 0.7)];
   box_xs = [-1; unifrnd(0.2, 0.4)];
   num_boxes = 15;
   for i2 = 1:num_boxes
     %box_xs = [box_xs; box_xs(end) + unifrnd(0.8, 1)];
-    box_xs = [box_xs; box_xs(end) + unifrnd(0.8, 1)];
+    box_xs = [box_xs; box_xs(end) + unifrnd(0.6, 0.8)];
   end
+
+  % flat ground
+  num_boxes = 4;
+  box_xs = [-1; 100; 200; 300; 400];
 
   box_h = 0.06;
   arg_str = sprintf('%f ', [box_h; box_xs]);
@@ -80,7 +87,7 @@ for i = 1:1
 
   clk = clock;
   model_num = round(clk(6)*1000000)
-  c = SNController(r, 1, model_num, 0.01, box_xs, box_h, num_box_ft);
+  c = SNController(r, 0, model_num, 0.01, box_xs, box_h, num_box_ft, 0);
   c = setSampleTime(c, [0.001;0]);
   %c = SNController(r);
   sys = feedback(r,c);
@@ -186,6 +193,8 @@ for i = 1:1
   % plot(log(4,:), 'g')
 
 end
+
+save('ff.mat', 'ff_torques')
 
 %fclose(good_out_file);
 %fclose(all_out_file);

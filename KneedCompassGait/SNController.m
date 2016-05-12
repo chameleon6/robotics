@@ -15,10 +15,11 @@ classdef SNController < DrakeSystem
     box_h
     box_xs
     num_box_ft
+    use_ff
   end
 
   methods
-    function obj = SNController(plant, use_net, model_num, output_dt, box_xs, box_h, num_box_ft)
+    function obj = SNController(plant, use_net, model_num, output_dt, box_xs, box_h, num_box_ft, use_ff)
 
       % global state_targets;
       % torso_lean = 0.1;
@@ -38,6 +39,8 @@ classdef SNController < DrakeSystem
       % };
 
       global state_targets;
+      global stance_time;
+      stance_time = 0;
       torso_lean = 0.;
       max_hip_angle = 1.4;
       max_knee_angle = 0.7;
@@ -76,6 +79,7 @@ classdef SNController < DrakeSystem
       obj.action_out_file = fopen(obj.action_out_file_name, 'w');
       obj.use_net = use_net;
       obj.output_dt = output_dt;
+      obj.use_ff = use_ff;
     end
 
     function h = ground_h(obj, x)
@@ -473,8 +477,24 @@ classdef SNController < DrakeSystem
       %u = [0;0;0;0;0;0];
       %return
 
+      [left_h, left_x] = obj.left_foot_coords(x);
+      left_contact = left_h < 0.0005;
+      [right_h, right_x] = obj.right_foot_coords(x);
+      right_contact = right_h < 0.0005;
+      global stance_time;
       global sim_fail_time
       global current_target_state
+
+      if (current_target_state == 1 | current_target_state == 2)
+        if left_contact & (t-stance_time) > 0.1
+          stance_time = t;
+        end
+      else
+        if right_contact & (t-stance_time) > 0.1
+          stance_time = t;
+        end
+      end
+
 
       if t - sim_fail_time > 0.0 | t == 0
         current_target_state = -1;
@@ -533,6 +553,7 @@ classdef SNController < DrakeSystem
         global max_hip_angle;
         global max_knee_angle;
         global state_targets;
+        global ff_torques;
 
         %targets = state_targets{current_target_state};
         targets = obj.feedback_adjust_state(current_target_state, x);
@@ -552,17 +573,29 @@ classdef SNController < DrakeSystem
         torso_swing_p = p_const;
         torso_swing_d = 2*sqrt(torso_swing_p);
         torso_im_torque = torso_swing_p * (torso_target - x(3)) - torso_swing_d * x(12);
+
         if current_target_state == 1 | current_target_state == 2
           stance_ind = 4;
           kick_ind = 1;
+          stance_type = 1;
         else
           stance_ind = 1;
           kick_ind = 4;
+          stance_type = 2;
         end
 
         u(stance_ind) = -torso_im_torque - u(kick_ind);
 
-        u = u + 3*randn(6,1);
+        if obj.use_ff
+          ff_a = 0.1;
+          t_ind = round((t-stance_time)/0.01) + 1;
+          uf = max(min(ff_torques(stance_type,:,t_ind)', 20), -20);
+          u = u + uf;
+          ff_torques(stance_type,:,t_ind) = ff_a * u + (1-ff_a) * uf;
+        end
+
+
+        %u = u + 3*randn(6,1);
       end
 
       max_abs_torque = 200;

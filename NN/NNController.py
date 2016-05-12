@@ -540,7 +540,8 @@ class NNController:
                 self.current_s_hist = []
                 self.current_t_hist = []
 
-            if reward != 0.0 and self.whole_second_frac(10):
+            #if reward != 0.0 and self.whole_second_frac(10):
+            if reward == 10.0:
                 print 'received reward', reward, 'at time', self.sim_t #, 'x', state[0]
 
             #certainty = self.certainty_net.q_from_sa(state.reshape((1,-1)))[0][0]
@@ -816,7 +817,7 @@ if __name__ == '__main__':
     pred, actual, rate = c.evaluate_simbicon(t)
     print 'correct rate', rate
     #c.run_no_matlab()
-    #c.run_matlab('RL')
+    c.run_matlab('RL')
 
     action_xs, action_us, action_us_orig = c.load_action_files(action_files)
     #action_xs, action_us = c.load_action_files_old(action_files)

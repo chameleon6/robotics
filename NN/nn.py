@@ -209,6 +209,7 @@ class ControlNN:
             xr = self.max_abs_torque * np.array([-1.,1])
         xs, inputs = self.s_const_grid(s, xr)
         outputs = self.q_from_sa(inputs).flatten()
+        print outputs
         best_input = np.argmax(outputs)
         return np.array([inputs[best_input][-1], outputs[best_input]])
 

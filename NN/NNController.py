@@ -11,6 +11,10 @@ from nn import ControlNN
 from TransitionContainer import TransitionContainer
 from NetVisualizer import NetVisualizer
 from matlab_rewards import *
+from sklearn import gaussian_process
+from scipy.stats import norm
+
+prof = Profiler()
 
 class NNController:
 
@@ -153,6 +157,41 @@ class NNController:
         logging.basicConfig(filename=self.log_path,level=logging.INFO)
         logging.info('log for %s', self.model_name)
         print 'saving to', self.save_path, 'logging to', self.log_path
+
+        self.b_dim = b_dim = 2
+        self.d_dim = d_dim = 1
+        self.b_params = []
+        self.d_params = []
+        self.r_by_params = []
+        self.cur_b = np.ones(self.b_dim)
+        self.cur_d = np.ones(self.d_dim)
+        self.cur_r = 0
+
+    def do_gp(self):
+        X = np.concatenate((np.array(self.b_params), np.array(self.d_params)),1)
+        gp = gaussian_process.GaussianProcess(theta0=1e-2, thetaL=1e-4, thetaU=1e-1)
+        gp.fit(X, self.r_by_params)
+        sl = slice(-5, 5, 0.1)
+        X_test = np.concatenate([x.flatten()[:,np.newaxis] for x in np.mgrid[sl, sl, sl]], 1)
+        prof.tic('pred')
+        ys, sigmas = gp.predict(X_test, eval_MSE=True)
+        prof.toc('pred')
+        y_max = max(self.r_by_params)
+        us = (ys - y_max) / sigmas
+        eis = sigmas * (us * norm.cdf(us) + norm.pdf(us))
+        best_params = X_test[np.argmax(eis)]
+        print 'best params', best_params
+        return best_params[:2], best_params[2:]
+
+    def b_transform(self, s):
+        assert s.shape == (2,)
+        return self.cur_b * s
+
+    def d_transform(self, a):
+        return np.maximum(-2., np.minimum(2., self.cur_d * a))
+
+    def state_noise(self, s):
+        return s * 2
 
     def initialize_nets(self):
         self.current_net = ControlNN(conf=self.conf, load_path=self.load_path)
@@ -358,7 +397,7 @@ class NNController:
     def run_dp_train(self):
 
         sa_costs = None
-        with open('dp_sa_cost.p', 'rb') as f:
+        with open('../Pendulum/dp_sa_cost.p', 'rb') as f:
             sa_costs = pickle.load(f).flatten()
 
         sa_samples = []
@@ -377,7 +416,7 @@ class NNController:
 
         sa_samples = np.array(sa_samples)
         n = len(sa_samples)
-        for i in range(100000):
+        for i in range(0):
             sample_size = n if i%100==0 else 50
             inds = np.random.choice(range(n), sample_size, False)
             #t = np.array(random.sample(sa_samples, sample_size))
@@ -511,6 +550,7 @@ class NNController:
 
             reward_str = lines[0].rstrip()
             reward = float(reward_str)
+            self.cur_r += reward
             # if reward > 0 and not self.succeeded and sim_t >= 0.05:
             #     logging.info('succeeded, reward=%s, sim_t=%s, state=%s', reward, sim_t, state)
             #     self.succeeded = True
@@ -523,7 +563,8 @@ class NNController:
 
             state_strs = lines[2].rstrip().split(' ')
             state = np.array(map(float, state_strs))
-            state = self.standardize_state(state)
+            if algo != 'pend_dp':
+                state = self.standardize_state(state)
 
             last_sim_t = self.sim_t
             self.sim_t = float(lines[3].rstrip())
@@ -539,6 +580,16 @@ class NNController:
                 self.current_a_hist = []
                 self.current_s_hist = []
                 self.current_t_hist = []
+                self.b_params.append(self.cur_b)
+                self.d_params.append(self.cur_d)
+                self.r_by_params.append(self.cur_r)
+                self.cur_r = 0
+                if len(self.b_params) > 1:
+                    self.cur_b, self.cur_d = self.do_gp()
+                else:
+                    self.cur_b, self.cur_d = np.random.randn(self.b_dim), \
+                            np.random.randn(self.d_dim)
+
 
             #if reward != 0.0 and self.whole_second_frac(10):
             if reward == 10.0:
@@ -558,6 +609,17 @@ class NNController:
             elif algo == 'action_net':
                 action = self.action_net_main(state)
                 write_str = ' '.join(map(str, action)) + '\n'
+            elif algo == 'pend_dp':
+                state = np.array(state)
+                state = self.state_noise(state)
+                state = self.b_transform(state)
+                output = self.current_net.manual_max_a_p(state[np.newaxis,:])
+                action = output[0,0]
+                action = self.d_transform(action)[0]
+                write_str = '%s\n' % action
+                print 'input', state
+                print 'output', output
+                print 'action', write_str
             else:
                 raise ValueError('Not a valid algo')
 
@@ -756,6 +818,11 @@ class NNController:
         return action
 
 if __name__ == '__main__':
+
+    c = NNController(conf='pendulum_new.conf')
+    #c.run_dp_train()
+    c.run_matlab('pend_dp')
+    sys.exit()
 
     c = NNController(conf='simbicon.conf')
     #file_nums = [52211431, 41983419]

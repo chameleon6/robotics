@@ -9,15 +9,15 @@
   <link name="box1">
     <visual>
       <geometry>
-        <box size="1.365671 100 1.060000"/>
+        <box size="101.100000 100 0.340000"/>
       </geometry>
-      <origin xyz="-0.417164 0 0.430000"/>
+      <origin xyz="49.450000 0 0.070000"/>
     </visual>
     <collision>
       <geometry>
-        <box size="1.365671 100 1.060000"/>
+        <box size="101.100000 100 0.340000"/>
       </geometry>
-      <origin xyz="-0.417164 0 0.430000"/>
+      <origin xyz="49.450000 0 0.070000"/>
     </collision>
     <inertial>
       <mass value="10"/>
@@ -32,15 +32,15 @@
   <link name="box2">
     <visual>
       <geometry>
-        <box size="1.068609 100 1.000000"/>
+        <box size="100.100000 100 0.280000"/>
       </geometry>
-      <origin xyz="0.699975 0 0.400000"/>
+      <origin xyz="149.950000 0 0.040000"/>
     </visual>
     <collision>
       <geometry>
-        <box size="1.068609 100 1.000000"/>
+        <box size="100.100000 100 0.280000"/>
       </geometry>
-      <origin xyz="0.699975 0 0.400000"/>
+      <origin xyz="149.950000 0 0.040000"/>
     </collision>
     <inertial>
       <mass value="10"/>
@@ -55,15 +55,15 @@
   <link name="box3">
     <visual>
       <geometry>
-        <box size="1.026250 100 0.940000"/>
+        <box size="100.100000 100 0.220000"/>
       </geometry>
-      <origin xyz="1.647405 0 0.370000"/>
+      <origin xyz="249.950000 0 0.010000"/>
     </visual>
     <collision>
       <geometry>
-        <box size="1.026250 100 0.940000"/>
+        <box size="100.100000 100 0.220000"/>
       </geometry>
-      <origin xyz="1.647405 0 0.370000"/>
+      <origin xyz="249.950000 0 0.010000"/>
     </collision>
     <inertial>
       <mass value="10"/>
@@ -78,291 +78,15 @@
   <link name="box4">
     <visual>
       <geometry>
-        <box size="0.956375 100 0.880000"/>
+        <box size="100.100000 100 0.160000"/>
       </geometry>
-      <origin xyz="2.538718 0 0.340000"/>
+      <origin xyz="349.950000 0 -0.020000"/>
     </visual>
     <collision>
       <geometry>
-        <box size="0.956375 100 0.880000"/>
+        <box size="100.100000 100 0.160000"/>
       </geometry>
-      <origin xyz="2.538718 0 0.340000"/>
-    </collision>
-    <inertial>
-      <mass value="10"/>
-      <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
-      <origin xyz="0.1 0 0"/>
-    </inertial>
-  </link>
-    
-    
-
-
-  <link name="box5">
-    <visual>
-      <geometry>
-        <box size="1.040730 100 0.820000"/>
-      </geometry>
-      <origin xyz="3.437270 0 0.310000"/>
-    </visual>
-    <collision>
-      <geometry>
-        <box size="1.040730 100 0.820000"/>
-      </geometry>
-      <origin xyz="3.437270 0 0.310000"/>
-    </collision>
-    <inertial>
-      <mass value="10"/>
-      <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
-      <origin xyz="0.1 0 0"/>
-    </inertial>
-  </link>
-    
-    
-
-
-  <link name="box6">
-    <visual>
-      <geometry>
-        <box size="0.925554 100 0.760000"/>
-      </geometry>
-      <origin xyz="4.320412 0 0.280000"/>
-    </visual>
-    <collision>
-      <geometry>
-        <box size="0.925554 100 0.760000"/>
-      </geometry>
-      <origin xyz="4.320412 0 0.280000"/>
-    </collision>
-    <inertial>
-      <mass value="10"/>
-      <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
-      <origin xyz="0.1 0 0"/>
-    </inertial>
-  </link>
-    
-    
-
-
-  <link name="box7">
-    <visual>
-      <geometry>
-        <box size="1.092742 100 0.700000"/>
-      </geometry>
-      <origin xyz="5.229560 0 0.250000"/>
-    </visual>
-    <collision>
-      <geometry>
-        <box size="1.092742 100 0.700000"/>
-      </geometry>
-      <origin xyz="5.229560 0 0.250000"/>
-    </collision>
-    <inertial>
-      <mass value="10"/>
-      <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
-      <origin xyz="0.1 0 0"/>
-    </inertial>
-  </link>
-    
-    
-
-
-  <link name="box8">
-    <visual>
-      <geometry>
-        <box size="0.907375 100 0.640000"/>
-      </geometry>
-      <origin xyz="6.129619 0 0.220000"/>
-    </visual>
-    <collision>
-      <geometry>
-        <box size="0.907375 100 0.640000"/>
-      </geometry>
-      <origin xyz="6.129619 0 0.220000"/>
-    </collision>
-    <inertial>
-      <mass value="10"/>
-      <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
-      <origin xyz="0.1 0 0"/>
-    </inertial>
-  </link>
-    
-    
-
-
-  <link name="box9">
-    <visual>
-      <geometry>
-        <box size="1.063335 100 0.580000"/>
-      </geometry>
-      <origin xyz="7.014974 0 0.190000"/>
-    </visual>
-    <collision>
-      <geometry>
-        <box size="1.063335 100 0.580000"/>
-      </geometry>
-      <origin xyz="7.014974 0 0.190000"/>
-    </collision>
-    <inertial>
-      <mass value="10"/>
-      <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
-      <origin xyz="0.1 0 0"/>
-    </inertial>
-  </link>
-    
-    
-
-
-  <link name="box10">
-    <visual>
-      <geometry>
-        <box size="0.907823 100 0.520000"/>
-      </geometry>
-      <origin xyz="7.900553 0 0.160000"/>
-    </visual>
-    <collision>
-      <geometry>
-        <box size="0.907823 100 0.520000"/>
-      </geometry>
-      <origin xyz="7.900553 0 0.160000"/>
-    </collision>
-    <inertial>
-      <mass value="10"/>
-      <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
-      <origin xyz="0.1 0 0"/>
-    </inertial>
-  </link>
-    
-    
-
-
-  <link name="box11">
-    <visual>
-      <geometry>
-        <box size="1.023624 100 0.460000"/>
-      </geometry>
-      <origin xyz="8.766276 0 0.130000"/>
-    </visual>
-    <collision>
-      <geometry>
-        <box size="1.023624 100 0.460000"/>
-      </geometry>
-      <origin xyz="8.766276 0 0.130000"/>
-    </collision>
-    <inertial>
-      <mass value="10"/>
-      <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
-      <origin xyz="0.1 0 0"/>
-    </inertial>
-  </link>
-    
-    
-
-
-  <link name="box12">
-    <visual>
-      <geometry>
-        <box size="0.981621 100 0.400000"/>
-      </geometry>
-      <origin xyz="9.668898 0 0.100000"/>
-    </visual>
-    <collision>
-      <geometry>
-        <box size="0.981621 100 0.400000"/>
-      </geometry>
-      <origin xyz="9.668898 0 0.100000"/>
-    </collision>
-    <inertial>
-      <mass value="10"/>
-      <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
-      <origin xyz="0.1 0 0"/>
-    </inertial>
-  </link>
-    
-    
-
-
-  <link name="box13">
-    <visual>
-      <geometry>
-        <box size="1.063512 100 0.340000"/>
-      </geometry>
-      <origin xyz="10.591465 0 0.070000"/>
-    </visual>
-    <collision>
-      <geometry>
-        <box size="1.063512 100 0.340000"/>
-      </geometry>
-      <origin xyz="10.591465 0 0.070000"/>
-    </collision>
-    <inertial>
-      <mass value="10"/>
-      <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
-      <origin xyz="0.1 0 0"/>
-    </inertial>
-  </link>
-    
-    
-
-
-  <link name="box14">
-    <visual>
-      <geometry>
-        <box size="1.062463 100 0.280000"/>
-      </geometry>
-      <origin xyz="11.554453 0 0.040000"/>
-    </visual>
-    <collision>
-      <geometry>
-        <box size="1.062463 100 0.280000"/>
-      </geometry>
-      <origin xyz="11.554453 0 0.040000"/>
-    </collision>
-    <inertial>
-      <mass value="10"/>
-      <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
-      <origin xyz="0.1 0 0"/>
-    </inertial>
-  </link>
-    
-    
-
-
-  <link name="box15">
-    <visual>
-      <geometry>
-        <box size="1.060488 100 0.220000"/>
-      </geometry>
-      <origin xyz="12.515928 0 0.010000"/>
-    </visual>
-    <collision>
-      <geometry>
-        <box size="1.060488 100 0.220000"/>
-      </geometry>
-      <origin xyz="12.515928 0 0.010000"/>
-    </collision>
-    <inertial>
-      <mass value="10"/>
-      <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
-      <origin xyz="0.1 0 0"/>
-    </inertial>
-  </link>
-    
-    
-
-
-  <link name="box16">
-    <visual>
-      <geometry>
-        <box size="1.072726 100 0.160000"/>
-      </geometry>
-      <origin xyz="13.482535 0 -0.020000"/>
-    </visual>
-    <collision>
-      <geometry>
-        <box size="1.072726 100 0.160000"/>
-      </geometry>
-      <origin xyz="13.482535 0 -0.020000"/>
+      <origin xyz="349.950000 0 -0.020000"/>
     </collision>
     <inertial>
       <mass value="10"/>

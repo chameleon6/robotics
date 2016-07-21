@@ -11,10 +11,12 @@ classdef NNController < DrakeSystem
 
       obj = obj@DrakeSystem(0,0,2,1,true,false); %%true?
       obj.p = plant;
-      obj.matlab_state_file = strcat(pwd,'/matlab_state_file.out');
-      obj.python_action_file = strcat(pwd,'/python_action_file.out');
+      obj.matlab_state_file = strcat(pwd,'/../NN/matlab_state_file.out');
+      obj.python_action_file = strcat(pwd,'/../NN/python_action_file.out');
       obj = obj.setInputFrame(plant.getStateFrame);
       obj = obj.setOutputFrame(plant.getInputFrame);
+      global last_action;
+      last_action = 0;
     end
 
     % function x0 = getInitialState(obj)
@@ -25,12 +27,30 @@ classdef NNController < DrakeSystem
     %   ts = [0.01; 0];
     % end
 
-    function r = reward(obj,x)
-      new_x = mod(x(1), 2*pi)
+    function r = reward(obj,x,t)
+      global last_action;
+      global sim_failed;
+      new_x = mod(x(1), 2*pi);
       %dist = (new_x - pi)^2
-      dist = cos(new_x)
-      speed = x(2)^2
-      r = -dist
+      dist = cos(new_x);
+      speed = x(2);
+      r = 5-dist - 0.03 * last_action^2 - 0.1 * speed^2;
+      if cos(x(1)) < -0.9
+        r = r + 5;
+      end
+
+      %if r < -5
+      %  sim_failed = 1;
+      %end
+
+      if abs(t - round(t)) < 0.0001
+        t
+        dist
+        speed
+        last_action
+        r
+        new_x
+      end
 
       %if cos(x(1)) < -0.9 & abs(x(2)) < 0.2
       %  r = 1
@@ -43,10 +63,12 @@ classdef NNController < DrakeSystem
     end
 
     function write_state(obj,x,t)
+      global sim_failed;
       f = fopen(obj.matlab_state_file, 'w');
       x_new = x;
       x_new(1) = mod(x(1), 2*pi);
-      fprintf(f, '%d\n', obj.reward(x));
+      fprintf(f, '%d\n', obj.reward(x,t));
+      fprintf(f, '%d\n', sim_failed);
       fprintf(f, '%d ', x_new);
       fprintf(f, '\n');
       fprintf(f, '%d\n', t);
@@ -115,9 +137,16 @@ classdef NNController < DrakeSystem
       %offset_u = p.m*p.g*p.lc*sin(q) + p.b*qd
       %u=(offset_u - p.I*(qd + sqrt(2)*(q-pi))) + 0.01;
 
-      t, x
+      global sim_failed;
+      if sim_failed
+        u = 0;
+        return
+      end
+
       obj.write_state(x,t);
-      u = obj.get_action()
+      u = obj.get_action();
+      global last_action;
+      last_action = u;
 
     end
   end
